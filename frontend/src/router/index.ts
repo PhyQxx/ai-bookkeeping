@@ -15,6 +15,7 @@ const router = createRouter({
         { path: 'home', name: 'Home', component: () => import('@/views/bill/Home.vue'), meta: { title: '首页' } },
         { path: 'bills', name: 'Bills', component: () => import('@/views/bill/BillList.vue'), meta: { title: '账单列表' } },
         { path: 'categories', name: 'Categories', component: () => import('@/views/category/CategoryManage.vue'), meta: { title: '分类管理' } },
+        { path: 'budget', name: 'Budget', component: () => import('@/views/budget/BudgetManage.vue'), meta: { title: '预算管理' } },
         { path: 'stats', name: 'Stats', component: () => import('@/views/stat/Statistics.vue'), meta: { title: '统计分析' } },
         { path: 'profile', name: 'Profile', component: () => import('@/views/profile/Profile.vue'), meta: { title: '个人中心' } }
       ]

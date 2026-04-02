@@ -1,6 +1,7 @@
 package com.aibookkeeping.controller;
 
 import com.aibookkeeping.dto.LoginRequest;
+import com.aibookkeeping.dto.RefreshTokenRequest;
 import com.aibookkeeping.dto.RegisterRequest;
 import com.aibookkeeping.exception.Result;
 import com.aibookkeeping.service.auth.AuthService;
@@ -14,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
-@Tag(name = "认证管理", description = "用户注册、登录、登出")
+@Tag(name = "认证管理", description = "用户注册、登录、登出、Token刷新")
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -31,6 +32,13 @@ public class AuthController {
     @Operation(summary = "用户登录")
     public Result<LoginVO> login(@Valid @RequestBody LoginRequest request) {
         LoginVO vo = authService.login(request);
+        return Result.success(vo);
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "刷新Token")
+    public Result<LoginVO> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        LoginVO vo = authService.refreshToken(request.getRefreshToken());
         return Result.success(vo);
     }
 

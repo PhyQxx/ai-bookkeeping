@@ -108,6 +108,19 @@ public class BillServiceImpl implements BillService {
     }
 
     @Override
+    public void batchDeleteBills(List<Long> ids, Long userId) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        for (Long id : ids) {
+            Bill bill = billMapper.selectById(id);
+            if (bill != null && bill.getUserId().equals(userId)) {
+                billMapper.deleteById(id);
+            }
+        }
+    }
+
+    @Override
     public Page<BillVO> listBills(Long userId, Integer type, Long categoryId,
                                    String startDate, String endDate, int pageNum, int pageSize) {
         Page<Bill> page = new Page<>(pageNum, pageSize);
@@ -185,4 +198,5 @@ public class BillServiceImpl implements BillService {
                 .createdAt(bill.getCreatedAt())
                 .build();
     }
+
 }

@@ -31,3 +31,11 @@ export function listBills(params: {
 export function getBill(id: number) {
   return request.get<any, Result<Bill>>(`/bill/${id}`)
 }
+
+export function getBillDetail(id: number) {
+  return request.get<any, Result<Bill>>(`/bill/${id}`)
+}
+
+export function batchDeleteBills(ids: number[]) {
+  return request.delete<any, Result<void>>('/bill/batch', { data: { ids } })
+}

@@ -3,17 +3,15 @@ package com.aibookkeeping.controller;
 import com.aibookkeeping.exception.Result;
 import com.aibookkeeping.service.stat.StatService;
 import com.aibookkeeping.vo.CategoryRatioVO;
+import com.aibookkeeping.vo.DailyTrendVO;
 import com.aibookkeeping.vo.MonthlyStatVO;
 import com.aibookkeeping.vo.TrendVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @RestController
@@ -46,12 +44,23 @@ public class StatController {
     }
 
     @GetMapping("/trend")
-    @Operation(summary = "消费趋势（近N个月）")
+    @Operation(summary = "消费趋势")
     public Result<List<TrendVO>> getTrend(
+            @RequestParam(required = false) String month,
             @RequestParam(defaultValue = "6") Integer months,
             Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        List<TrendVO> list = statService.getTrend(userId, months);
+        List<TrendVO> list = statService.getTrend(userId, month, months);
+        return Result.success(list);
+    }
+
+    @GetMapping("/daily-trend")
+    @Operation(summary = "日收支趋势（按天）")
+    public Result<List<DailyTrendVO>> getDailyTrend(
+            @RequestParam String month,
+            Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        List<DailyTrendVO> list = statService.getDailyTrend(userId, month);
         return Result.success(list);
     }
 }

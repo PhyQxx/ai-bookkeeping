@@ -25,6 +25,7 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(1003, "用户名或密码错误"),
     TOKEN_EXPIRED(1004, "Token已过期"),
     TOKEN_INVALID(1005, "Token无效"),
+    INVALID_TOKEN(1006, "Token验证失败"),
 
     // 账单 20xx
     BILL_NOT_FOUND(2001, "账单不存在"),
@@ -41,7 +42,14 @@ public enum ErrorCode {
 
     // AI 40xx
     AI_SERVICE_UNAVAILABLE(4001, "AI服务不可用"),
-    AI_RATE_LIMITED(4002, "AI调用频率超限，请稍后再试");
+    AI_RATE_LIMITED(4002, "AI调用频率超限，请稍后再试"),
+
+    // 预算 50xx
+    BUDGET_NOT_FOUND(5001, "预算不存在"),
+    BUDGET_NO_PERMISSION(5002, "无权限操作此预算"),
+
+    // 用户 60xx
+    OLD_PASSWORD_INCORRECT(6001, "原密码错误");
 
     private final int code;
     private final String message;

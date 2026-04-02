@@ -5,19 +5,21 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LoginVO {
+public class UserVO {
 
-    private String token;
-
-    private String refreshToken;
+    private Long id;
 
     private String username;
 
     private String nickname;
 
     private String avatar;
+
+    private LocalDateTime createdAt;
 }

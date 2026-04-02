@@ -29,8 +29,19 @@
         <div class="value balance">¥ {{ monthlyStat?.balance?.toFixed(2) || '0.00' }}</div>
       </div>
       <div class="stat-card">
-        <div class="label">账单笔数</div>
-        <div class="value balance">{{ monthlyStat?.billCount || 0 }}</div>
+        <div class="label">预算使用</div>
+        <div v-if="budgetUsageData" style="margin-top: 4px;">
+          <div style="font-size: 14px; color: #909399; margin-bottom: 4px;">
+            ¥{{ budgetUsageData.totalUsed.toFixed(2) }} / ¥{{ budgetUsageData.totalBudget.toFixed(2) }}
+          </div>
+          <el-progress
+            :percentage="Math.min(Math.round(budgetUsageData.totalUsed / budgetUsageData.totalBudget * 100), 100)"
+            :color="budgetUsageData.totalUsed / budgetUsageData.totalBudget >= 1 ? '#F56C6C' : budgetUsageData.totalUsed / budgetUsageData.totalBudget >= 0.8 ? '#E6A23C' : '#409EFF'"
+            :stroke-width="12"
+            :text-inside="true"
+          />
+        </div>
+        <div v-else style="font-size: 14px; color: #909399;">{{ monthlyStat?.billCount || 0 }} 笔账单</div>
       </div>
     </div>
 
@@ -59,7 +70,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { getMonthlyStat, getCategoryRatio, getTrend } from '@/api/stat'
-import type { MonthlyStat, CategoryRatio, TrendItem } from '@/types'
+import { getBudgetUsage } from '@/api/budget'
+import type { MonthlyStat, CategoryRatio, TrendItem, BudgetUsage } from '@/types'
 import dayjs from 'dayjs'
 import * as echarts from 'echarts'
 
@@ -67,6 +79,7 @@ const selectedMonth = ref(dayjs().format('YYYY-MM'))
 const monthlyStat = ref<MonthlyStat | null>(null)
 const categoryRatios = ref<CategoryRatio[]>([])
 const trendData = ref<TrendItem[]>([])
+const budgetUsageData = ref<BudgetUsage | null>(null)
 
 const pieChartRef = ref<HTMLElement>()
 const lineChartRef = ref<HTMLElement>()
@@ -83,6 +96,13 @@ const loadData = async () => {
     monthlyStat.value = statRes.data
     categoryRatios.value = ratioRes.data
     trendData.value = trendRes.data
+    // 加载预算使用情况
+    try {
+      const budgetRes = await getBudgetUsage(selectedMonth.value)
+      budgetUsageData.value = budgetRes.data
+    } catch {
+      budgetUsageData.value = null
+    }
     await nextTick()
     renderPieChart()
     renderLineChart()

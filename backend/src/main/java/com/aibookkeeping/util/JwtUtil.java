@@ -17,24 +17,47 @@ public class JwtUtil {
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.expiration}")
-    private long expiration;
+    @Value("${jwt.access-expiration:7200000}")
+    private long accessExpiration; // 默认 2 小时
+
+    @Value("${jwt.refresh-expiration:604800000}")
+    private long refreshExpiration; // 默认 7 天
 
     private SecretKey getKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
-     * 生成 JWT Token
+     * 生成 Access Token（2小时）
      */
-    public String generateToken(Long userId, String username) {
+    public String generateAccessToken(Long userId, String username) {
         return Jwts.builder()
-                .claims(Map.of("userId", userId, "username", username))
+                .claims(Map.of("userId", userId, "username", username, "type", "access"))
                 .subject(username)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .expiration(new Date(System.currentTimeMillis() + accessExpiration))
                 .signWith(getKey())
                 .compact();
+    }
+
+    /**
+     * 生成 Refresh Token（7天）
+     */
+    public String generateRefreshToken(Long userId, String username) {
+        return Jwts.builder()
+                .claims(Map.of("userId", userId, "username", username, "type", "refresh"))
+                .subject(username)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + refreshExpiration))
+                .signWith(getKey())
+                .compact();
+    }
+
+    /**
+     * @deprecated 使用 generateAccessToken 代替
+     */
+    public String generateToken(Long userId, String username) {
+        return generateAccessToken(userId, username);
     }
 
     /**
@@ -62,6 +85,25 @@ public class JwtUtil {
     public String getUsername(String token) {
         Claims claims = parseToken(token);
         return claims.getSubject();
+    }
+
+    /**
+     * 获取 Token 类型（access / refresh）
+     */
+    public String getTokenType(String token) {
+        Claims claims = parseToken(token);
+        return claims.get("type", String.class);
+    }
+
+    /**
+     * 判断是否为 Refresh Token
+     */
+    public boolean isRefreshToken(String token) {
+        try {
+            return "refresh".equals(getTokenType(token));
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**

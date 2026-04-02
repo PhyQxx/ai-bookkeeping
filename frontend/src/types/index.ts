@@ -115,3 +115,20 @@ export interface TrendItem {
   income: number
   expense: number
 }
+
+/** 预算 */
+export interface Budget {
+  id: number
+  categoryId: number
+  categoryName: string
+  month: string
+  amount: number
+  usedAmount: number
+}
+
+/** 预算使用情况 */
+export interface BudgetUsage {
+  totalBudget: number
+  totalUsed: number
+  items: Budget[]
+}

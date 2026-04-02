@@ -34,15 +34,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = extractToken(request);
 
         if (token != null && jwtUtil.validateToken(token)) {
-            // 检查 Token 是否在 Redis 黑名单中（已注销）
+            // 检查 Token 是否在 Redis 黑名单中（已注销或已刷新）
             Boolean isBlacklisted = redisTemplate.hasKey("token:blacklist:" + token);
             if (Boolean.TRUE.equals(isBlacklisted)) {
                 filterChain.doFilter(request, response);
                 return;
             }
 
+            // Refresh Token 不能用于接口访问
+            if (jwtUtil.isRefreshToken(token)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             Long userId = jwtUtil.getUserId(token);
             String username = jwtUtil.getUsername(token);
+
+            // 校验 token 是否与 Redis 中一致（支持主动失效）
+            String cachedToken = (String) redisTemplate.opsForValue().get("token:access:" + userId);
+            if (cachedToken != null && !cachedToken.equals(token)) {
+                // Token 不一致，说明已生成新 token，旧 token 失效
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             List<SimpleGrantedAuthority> authorities = Collections.emptyList();
             UsernamePasswordAuthenticationToken authentication =

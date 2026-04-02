@@ -6,6 +6,7 @@
         <el-menu-item index="/home"><el-icon><HomeFilled /></el-icon><span>首页</span></el-menu-item>
         <el-menu-item index="/bills"><el-icon><List /></el-icon><span>账单列表</span></el-menu-item>
         <el-menu-item index="/categories"><el-icon><Grid /></el-icon><span>分类管理</span></el-menu-item>
+        <el-menu-item index="/budget"><el-icon><Wallet /></el-icon><span>预算管理</span></el-menu-item>
         <el-menu-item index="/stats"><el-icon><DataAnalysis /></el-icon><span>统计分析</span></el-menu-item>
         <el-menu-item index="/profile"><el-icon><User /></el-icon><span>个人中心</span></el-menu-item>
       </el-menu>
@@ -27,7 +28,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { HomeFilled, List, Grid, DataAnalysis, User, SwitchButton } from '@element-plus/icons-vue'
+import { HomeFilled, List, Grid, DataAnalysis, User, SwitchButton, Wallet } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

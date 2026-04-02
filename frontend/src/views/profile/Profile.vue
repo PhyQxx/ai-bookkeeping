@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div v-loading="loading">
     <div class="page-header">
       <h2>个人中心</h2>
     </div>
@@ -11,7 +11,7 @@
             <span>用户信息</span>
           </template>
           <div style="text-align: center; padding: 20px 0;">
-            <el-avatar :size="80" icon="UserFilled" />
+            <el-avatar :size="80" :src="userStore.userInfo?.avatar || ''" icon="UserFilled" />
             <h3 style="margin-top: 12px;">{{ userStore.userInfo?.nickname || userStore.userInfo?.username }}</h3>
             <p style="color: #909399; font-size: 14px;">{{ userStore.userInfo?.username }}</p>
           </div>
@@ -31,7 +31,7 @@
               <el-input v-model="profileForm.avatar" placeholder="头像URL" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="handleSaveProfile">保存修改</el-button>
+              <el-button type="primary" @click="handleSaveProfile" :loading="profileLoading">保存修改</el-button>
             </el-form-item>
           </el-form>
         </el-card>
@@ -51,7 +51,7 @@
               <el-input v-model="passwordForm.confirmPassword" type="password" show-password />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="handleChangePassword">修改密码</el-button>
+              <el-button type="primary" @click="handleChangePassword" :loading="passwordLoading">修改密码</el-button>
             </el-form-item>
           </el-form>
         </el-card>
@@ -61,15 +61,21 @@
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { getUserInfo, updateUserInfo, changePassword } from '@/api/user'
 import { ElMessage } from 'element-plus'
 
+const router = useRouter()
 const userStore = useUserStore()
+const loading = ref(false)
+const profileLoading = ref(false)
+const passwordLoading = ref(false)
 
 const profileForm = reactive({
-  nickname: userStore.userInfo?.nickname || '',
-  avatar: userStore.userInfo?.avatar || ''
+  nickname: '',
+  avatar: ''
 })
 
 const passwordForm = reactive({
@@ -78,11 +84,49 @@ const passwordForm = reactive({
   confirmPassword: ''
 })
 
-const handleSaveProfile = () => {
-  ElMessage.info('个人信息修改功能开发中...')
+// 加载用户信息
+const loadUserInfo = async () => {
+  loading.value = true
+  try {
+    const res = await getUserInfo()
+    const data = res.data as any
+    profileForm.nickname = data.nickname || ''
+    profileForm.avatar = data.avatar || ''
+    // 更新 store
+    if (data.nickname || data.avatar) {
+      const updated = { ...userStore.userInfo, ...data }
+      userStore.userInfo = updated
+      localStorage.setItem('user', JSON.stringify(updated))
+    }
+  } catch {
+    // 接口不可用时使用本地数据
+    profileForm.nickname = userStore.userInfo?.nickname || ''
+    profileForm.avatar = userStore.userInfo?.avatar || ''
+  } finally {
+    loading.value = false
+  }
 }
 
-const handleChangePassword = () => {
+const handleSaveProfile = async () => {
+  profileLoading.value = true
+  try {
+    await updateUserInfo({
+      nickname: profileForm.nickname,
+      avatar: profileForm.avatar
+    })
+    // 更新本地 store
+    const updated = { ...userStore.userInfo!, nickname: profileForm.nickname, avatar: profileForm.avatar }
+    userStore.userInfo = updated
+    localStorage.setItem('user', JSON.stringify(updated))
+    ElMessage.success('保存成功')
+  } catch {
+    // 错误已在拦截器处理
+  } finally {
+    profileLoading.value = false
+  }
+}
+
+const handleChangePassword = async () => {
   if (!passwordForm.oldPassword || !passwordForm.newPassword) {
     ElMessage.warning('请填写完整密码信息')
     return
@@ -91,6 +135,29 @@ const handleChangePassword = () => {
     ElMessage.warning('两次密码不一致')
     return
   }
-  ElMessage.info('密码修改功能开发中...')
+  if (passwordForm.newPassword.length < 6) {
+    ElMessage.warning('新密码至少6位')
+    return
+  }
+  passwordLoading.value = true
+  try {
+    await changePassword({
+      oldPassword: passwordForm.oldPassword,
+      newPassword: passwordForm.newPassword
+    })
+    ElMessage.success('密码修改成功，请重新登录')
+    passwordForm.oldPassword = ''
+    passwordForm.newPassword = ''
+    passwordForm.confirmPassword = ''
+    // 退出登录
+    await userStore.logout()
+    router.push('/login')
+  } catch {
+    // 错误已在拦截器处理
+  } finally {
+    passwordLoading.value = false
+  }
 }
+
+onMounted(() => loadUserInfo())
 </script>

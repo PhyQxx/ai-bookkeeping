@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/bill")
 @Tag(name = "账单管理", description = "AI 记账、手动记账、账单列表")
@@ -56,6 +58,15 @@ public class BillController {
                                     Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
         billService.deleteBill(id, userId);
+        return Result.success();
+    }
+
+    @DeleteMapping("/batch")
+    @Operation(summary = "批量删除账单")
+    public Result<Void> batchDeleteBills(@RequestBody List<Long> ids,
+                                          Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        billService.batchDeleteBills(ids, userId);
         return Result.success();
     }
 

@@ -57,13 +57,17 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
-        String token = jwtUtil.generateToken(user.getId(), user.getUsername());
+        // 生成双 Token
+        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getUsername());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getUsername());
 
-        // 存入 Redis，支持主动失效
-        redisTemplate.opsForValue().set("token:user:" + user.getId(), token, 7, TimeUnit.DAYS);
+        // 存入 Redis
+        redisTemplate.opsForValue().set("token:access:" + user.getId(), accessToken, 2, TimeUnit.HOURS);
+        redisTemplate.opsForValue().set("token:refresh:" + user.getId(), refreshToken, 7, TimeUnit.DAYS);
 
         return LoginVO.builder()
-                .token(token)
+                .token(accessToken)
+                .refreshToken(refreshToken)
                 .username(user.getUsername())
                 .nickname(user.getNickname())
                 .avatar(user.getAvatar())
@@ -71,11 +75,61 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    public LoginVO refreshToken(String refreshToken) {
+        // 验证 Refresh Token
+        if (!jwtUtil.isRefreshToken(refreshToken)) {
+            throw new BusinessException(ErrorCode.INVALID_TOKEN, "无效的刷新令牌");
+        }
+        if (!jwtUtil.validateToken(refreshToken)) {
+            throw new BusinessException(ErrorCode.TOKEN_EXPIRED, "刷新令牌已过期，请重新登录");
+        }
+
+        // 检查黑名单
+        if (Boolean.TRUE.equals(redisTemplate.hasKey("token:blacklist:" + refreshToken))) {
+            throw new BusinessException(ErrorCode.INVALID_TOKEN, "令牌已失效");
+        }
+
+        Long userId = jwtUtil.getUserId(refreshToken);
+        String username = jwtUtil.getUsername(refreshToken);
+
+        // 检查 Redis 中的 Refresh Token 是否匹配
+        String storedRefreshToken = (String) redisTemplate.opsForValue().get("token:refresh:" + userId);
+        if (storedRefreshToken == null || !storedRefreshToken.equals(refreshToken)) {
+            throw new BusinessException(ErrorCode.INVALID_TOKEN, "刷新令牌不匹配");
+        }
+
+        // 生成新的双 Token
+        String newAccessToken = jwtUtil.generateAccessToken(userId, username);
+        String newRefreshToken = jwtUtil.generateRefreshToken(userId, username);
+
+        // 更新 Redis
+        redisTemplate.opsForValue().set("token:access:" + userId, newAccessToken, 2, TimeUnit.HOURS);
+        redisTemplate.opsForValue().set("token:refresh:" + userId, newRefreshToken, 7, TimeUnit.DAYS);
+
+        // 旧 Refresh Token 加入黑名单
+        redisTemplate.opsForValue().set("token:blacklist:" + refreshToken, "1", 7, TimeUnit.DAYS);
+
+        log.info("Token refreshed for user: {}", username);
+
+        return LoginVO.builder()
+                .token(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .username(username)
+                .build();
+    }
+
+    @Override
     public void logout(String token) {
         try {
             Long userId = jwtUtil.getUserId(token);
-            redisTemplate.opsForValue().set("token:blacklist:" + token, "1", 7, TimeUnit.DAYS);
-            redisTemplate.delete("token:user:" + userId);
+            // 将当前 Token 加入黑名单
+            long remaining = jwtUtil.parseToken(token).getExpiration().getTime() - System.currentTimeMillis();
+            if (remaining > 0) {
+                redisTemplate.opsForValue().set("token:blacklist:" + token, "1", remaining, TimeUnit.MILLISECONDS);
+            }
+            // 清除 Redis 中的 Token
+            redisTemplate.delete("token:access:" + userId);
+            redisTemplate.delete("token:refresh:" + userId);
             log.info("User logged out: userId={}", userId);
         } catch (Exception e) {
             log.warn("Failed to logout: {}", e.getMessage());

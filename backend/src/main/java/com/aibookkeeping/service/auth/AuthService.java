@@ -10,5 +10,7 @@ public interface AuthService {
 
     LoginVO login(LoginRequest request);
 
+    LoginVO refreshToken(String refreshToken);
+
     void logout(String token);
 }

@@ -5,6 +5,7 @@ import com.aibookkeeping.entity.Category;
 import com.aibookkeeping.mapper.BillMapper;
 import com.aibookkeeping.mapper.CategoryMapper;
 import com.aibookkeeping.vo.CategoryRatioVO;
+import com.aibookkeeping.vo.DailyTrendVO;
 import com.aibookkeeping.vo.MonthlyStatVO;
 import com.aibookkeeping.vo.TrendVO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -76,7 +77,6 @@ public class StatServiceImpl implements StatService {
 
         List<Bill> bills = billMapper.selectList(wrapper);
 
-        // 按 categoryId 分组汇总
         Map<Long, BigDecimal> amountByCategory = bills.stream()
                 .filter(b -> b.getCategoryId() != null)
                 .collect(Collectors.groupingBy(
@@ -103,12 +103,18 @@ public class StatServiceImpl implements StatService {
     }
 
     @Override
-    public List<TrendVO> getTrend(Long userId, Integer months) {
+    public List<TrendVO> getTrend(Long userId, String month, Integer months) {
         List<TrendVO> trends = new ArrayList<>();
-        YearMonth current = YearMonth.now();
+        YearMonth end;
+
+        if (month != null && !month.isEmpty()) {
+            end = YearMonth.parse(month, DateTimeFormatter.ofPattern("yyyy-MM"));
+        } else {
+            end = YearMonth.now();
+        }
 
         for (int i = months - 1; i >= 0; i--) {
-            YearMonth target = current.minusMonths(i);
+            YearMonth target = end.minusMonths(i);
             LocalDate startDate = target.atDay(1);
             LocalDate endDate = target.atEndOfMonth();
 
@@ -137,6 +143,46 @@ public class StatServiceImpl implements StatService {
         }
 
         return trends;
+    }
+
+    @Override
+    public List<DailyTrendVO> getDailyTrend(Long userId, String month) {
+        YearMonth yearMonth = YearMonth.parse(month, DateTimeFormatter.ofPattern("yyyy-MM"));
+        LocalDate startDate = yearMonth.atDay(1);
+        LocalDate endDate = yearMonth.atEndOfMonth();
+
+        LambdaQueryWrapper<Bill> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Bill::getUserId, userId)
+               .ge(Bill::getBillDate, startDate)
+               .le(Bill::getBillDate, endDate)
+               .orderByAsc(Bill::getBillDate);
+
+        List<Bill> bills = billMapper.selectList(wrapper);
+
+        // 按日期分组
+        Map<LocalDate, List<Bill>> billsByDate = bills.stream()
+                .collect(Collectors.groupingBy(Bill::getBillDate));
+
+        List<DailyTrendVO> result = new ArrayList<>();
+        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+            List<Bill> dayBills = billsByDate.getOrDefault(date, List.of());
+            BigDecimal income = dayBills.stream()
+                    .filter(b -> b.getType() == 1)
+                    .map(Bill::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal expense = dayBills.stream()
+                    .filter(b -> b.getType() == 2)
+                    .map(Bill::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            result.add(DailyTrendVO.builder()
+                    .date(date.toString())
+                    .income(income)
+                    .expense(expense)
+                    .build());
+        }
+
+        return result;
     }
 
     private Map<Long, String> getCategoryMap() {

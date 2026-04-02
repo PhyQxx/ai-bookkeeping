@@ -1,5 +1,33 @@
 <template>
   <div>
+    <!-- 预算使用进度 -->
+    <el-card v-if="budgetUsage" style="margin-bottom: 16px;">
+      <template #header>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span>💰 当月预算</span>
+          <el-button text type="primary" @click="$router.push('/budget')">管理预算</el-button>
+        </div>
+      </template>
+      <div style="margin-bottom: 8px; display: flex; justify-content: space-between;">
+        <span>总预算: ¥{{ budgetUsage.totalBudget.toFixed(2) }}</span>
+        <span>已使用: ¥{{ budgetUsage.totalUsed.toFixed(2) }}</span>
+      </div>
+      <el-progress
+        :percentage="budgetPercentage"
+        :color="budgetColor"
+        :stroke-width="20"
+        :text-inside="true"
+      />
+      <div v-if="budgetPercentage >= 100" style="color: #f56c6c; margin-top: 8px; font-weight: bold;">
+        ⚠️ 已超支 ¥{{ (budgetUsage.totalUsed - budgetUsage.totalBudget).toFixed(2) }}！请控制消费
+      </div>
+    </el-card>
+    <el-card v-else-if="budgetLoaded" style="margin-bottom: 16px; text-align: center; padding: 16px;">
+      <el-empty description="尚未设置本月预算" :image-size="60">
+        <el-button type="primary" @click="$router.push('/budget')">设置预算</el-button>
+      </el-empty>
+    </el-card>
+
     <!-- AI 记账输入 -->
     <div class="ai-input-section">
       <h3>🤖 AI 智能记账</h3>
@@ -104,7 +132,10 @@
     </el-dialog>
 
     <!-- 最近账单列表 -->
-    <el-table :data="recentBills" stripe style="width: 100%;">
+    <el-table :data="recentBills" stripe style="width: 100%;" v-loading="billsLoading">
+      <template #empty>
+        <el-empty description="暂无账单记录" />
+      </template>
       <el-table-column prop="billDate" label="日期" width="120" />
       <el-table-column prop="categoryName" label="分类" width="100" />
       <el-table-column prop="remark" label="备注" />
@@ -137,9 +168,10 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { aiParseBill, createBill, listBills } from '@/api/bill'
 import { listCategories } from '@/api/category'
 import { getMonthlyStat } from '@/api/stat'
-import type { AiParseVO, Bill, Category, MonthlyStat } from '@/types'
+import { getBudgetUsage } from '@/api/budget'
+import type { AiParseVO, Bill, Category, MonthlyStat, BudgetUsage } from '@/types'
 import dayjs from 'dayjs'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const aiInput = ref('')
 const aiLoading = ref(false)
@@ -147,8 +179,12 @@ const parseResult = ref<AiParseVO | null>(null)
 const showResult = ref(false)
 const recentBills = ref<Bill[]>([])
 const categories = ref<Category[]>([])
-const todayStats = ref<MonthlyStat | null>(null)
 const monthStats = ref<MonthlyStat | null>(null)
+const billsLoading = ref(false)
+
+// 预算相关
+const budgetUsage = ref<BudgetUsage | null>(null)
+const budgetLoaded = ref(false)
 
 const showManualDialog = ref(false)
 const manualLoading = ref(false)
@@ -160,8 +196,18 @@ const manualForm = reactive({
   remark: ''
 })
 
+const budgetPercentage = computed(() => {
+  if (!budgetUsage.value || budgetUsage.value.totalBudget <= 0) return 0
+  return Math.min(Math.round((budgetUsage.value.totalUsed / budgetUsage.value.totalBudget) * 100), 100)
+})
+
+const budgetColor = computed(() => {
+  if (budgetPercentage.value >= 100) return '#F56C6C'
+  if (budgetPercentage.value >= 80) return '#E6A23C'
+  return '#409EFF'
+})
+
 const todayExpense = computed(() => {
-  // 简单从最近账单中统计今日支出
   const today = dayjs().format('YYYY-MM-DD')
   return recentBills.value
     .filter(b => b.billDate === today && b.type === 2)
@@ -188,6 +234,26 @@ const filteredCategories = computed(() =>
   categories.value.filter(c => c.type === manualForm.type)
 )
 
+// 记账后检查超支
+const checkOverspend = () => {
+  if (budgetUsage.value && budgetUsage.value.totalBudget > 0) {
+    if (budgetUsage.value.totalUsed > budgetUsage.value.totalBudget) {
+      const overAmount = (budgetUsage.value.totalUsed - budgetUsage.value.totalBudget).toFixed(2)
+      ElMessageBox.alert(
+        `本月已支出 ¥${budgetUsage.value.totalUsed.toFixed(2)}，超出预算 ¥${overAmount}，请注意控制消费！`,
+        '⚠️ 预算超支警告',
+        { type: 'warning', confirmButtonText: '知道了' }
+      )
+    } else if (budgetUsage.value.totalUsed / budgetUsage.value.totalBudget >= 0.8) {
+      ElMessageBox.alert(
+        `本月预算使用已达 ${Math.round(budgetUsage.value.totalUsed / budgetUsage.value.totalBudget * 100)}%，请注意控制消费。`,
+        '💡 预算提醒',
+        { type: 'info', confirmButtonText: '知道了' }
+      )
+    }
+  }
+}
+
 const handleAiParse = async () => {
   if (!aiInput.value.trim()) return
   aiLoading.value = true
@@ -199,6 +265,9 @@ const handleAiParse = async () => {
     if (res.data.success) {
       ElMessage.success('AI 记账成功！')
       loadRecentBills()
+      loadBudgetUsage()
+      // 延迟检查超支，等预算数据更新
+      setTimeout(checkOverspend, 1000)
     }
   } catch (e) {
     // 错误已在拦截器处理
@@ -221,6 +290,8 @@ const handleManualCreate = async () => {
     manualForm.categoryId = undefined
     manualForm.remark = ''
     loadRecentBills()
+    loadBudgetUsage()
+    setTimeout(checkOverspend, 1000)
   } catch (e) {
     // 错误已在拦截器处理
   } finally {
@@ -229,10 +300,13 @@ const handleManualCreate = async () => {
 }
 
 const loadRecentBills = async () => {
+  billsLoading.value = true
   try {
     const res = await listBills({ pageNum: 1, pageSize: 10 })
     recentBills.value = res.data.records
-  } catch (e) {}
+  } catch (e) {} finally {
+    billsLoading.value = false
+  }
 }
 
 const loadCategories = async () => {
@@ -249,9 +323,20 @@ const loadMonthStats = async () => {
   } catch (e) {}
 }
 
+const loadBudgetUsage = async () => {
+  try {
+    const res = await getBudgetUsage(dayjs().format('YYYY-MM'))
+    budgetUsage.value = res.data
+    budgetLoaded.value = true
+  } catch {
+    budgetLoaded.value = true
+  }
+}
+
 onMounted(() => {
   loadRecentBills()
   loadCategories()
   loadMonthStats()
+  loadBudgetUsage()
 })
 </script>
