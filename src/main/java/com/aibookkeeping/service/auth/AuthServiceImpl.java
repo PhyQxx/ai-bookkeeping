@@ -3,6 +3,8 @@ package com.aibookkeeping.service.auth;
 import com.aibookkeeping.dto.LoginRequest;
 import com.aibookkeeping.dto.RegisterRequest;
 import com.aibookkeeping.entity.User;
+import com.aibookkeeping.exception.BusinessException;
+import com.aibookkeeping.exception.ErrorCode;
 import com.aibookkeeping.mapper.UserMapper;
 import com.aibookkeeping.util.JwtUtil;
 import com.aibookkeeping.vo.LoginVO;
@@ -27,11 +29,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void register(RegisterRequest request) {
-        // 检查用户名是否已存在
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(User::getUsername, request.getUsername());
         if (userMapper.selectOne(wrapper) != null) {
-            throw new RuntimeException("用户名已存在");
+            throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS);
         }
 
         User user = new User();
@@ -49,13 +50,16 @@ public class AuthServiceImpl implements AuthService {
         wrapper.eq(User::getUsername, request.getUsername());
         User user = userMapper.selectOne(wrapper);
 
-        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("用户名或密码错误");
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         String token = jwtUtil.generateToken(user.getId(), user.getUsername());
 
-        // 将 Token 存入 Redis
+        // 存入 Redis，支持主动失效
         redisTemplate.opsForValue().set("token:user:" + user.getId(), token, 7, TimeUnit.DAYS);
 
         return LoginVO.builder()
@@ -70,7 +74,6 @@ public class AuthServiceImpl implements AuthService {
     public void logout(String token) {
         try {
             Long userId = jwtUtil.getUserId(token);
-            // 将 Token 加入黑名单，过期时间与 JWT 一致
             redisTemplate.opsForValue().set("token:blacklist:" + token, "1", 7, TimeUnit.DAYS);
             redisTemplate.delete("token:user:" + userId);
             log.info("User logged out: userId={}", userId);

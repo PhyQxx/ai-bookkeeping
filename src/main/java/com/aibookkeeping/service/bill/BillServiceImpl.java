@@ -6,6 +6,8 @@ import com.aibookkeeping.dto.AiParseRequest;
 import com.aibookkeeping.dto.BillRequest;
 import com.aibookkeeping.entity.Bill;
 import com.aibookkeeping.entity.Category;
+import com.aibookkeeping.exception.BusinessException;
+import com.aibookkeeping.exception.ErrorCode;
 import com.aibookkeeping.mapper.BillMapper;
 import com.aibookkeeping.mapper.CategoryMapper;
 import com.aibookkeeping.vo.AiParseVO;
@@ -16,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -32,32 +35,23 @@ public class BillServiceImpl implements BillService {
 
     @Override
     public AiParseVO aiParseAndCreate(AiParseRequest request, Long userId) {
-        // 调用 AI 解析
-        BillParseResult result = aiService.parseBillInput(request.getInput());
-        if (result == null) {
-            return AiParseVO.builder()
-                    .success(false)
-                    .errorMessage("AI 解析失败，请尝试更详细的描述或手动输入")
-                    .build();
-        }
+        BillParseResult result = aiService.parseBillInput(request.getInput(), userId);
 
-        // 根据 AI 返回的分类名称查找分类ID
         Long categoryId = findCategoryIdByName(result.getCategory());
 
-        // 创建账单
         Bill bill = new Bill();
         bill.setUserId(userId);
-        bill.setAmount(result.getAmount());
-        bill.setType(result.getAmount().compareTo(java.math.BigDecimal.ZERO) >= 0 ? 1 : 2);
+        bill.setAmount(result.getAmount().abs());
+        bill.setType(result.getAmount().compareTo(BigDecimal.ZERO) >= 0 ? 2 : 1);
         bill.setCategoryId(categoryId);
         bill.setBillDate(result.getDate() != null ? result.getDate() : LocalDate.now());
         bill.setRemark(result.getRemark());
-        bill.setInputType(1); // AI输入
+        bill.setInputType(1);
         billMapper.insert(bill);
 
         return AiParseVO.builder()
                 .success(true)
-                .amount(result.getAmount())
+                .amount(bill.getAmount())
                 .category(result.getCategory())
                 .categoryId(categoryId)
                 .date(bill.getBillDate().toString())
@@ -68,6 +62,8 @@ public class BillServiceImpl implements BillService {
 
     @Override
     public BillVO createBill(BillRequest request, Long userId) {
+        validateBillRequest(request);
+
         Bill bill = new Bill();
         bill.setUserId(userId);
         bill.setAmount(request.getAmount());
@@ -75,7 +71,7 @@ public class BillServiceImpl implements BillService {
         bill.setCategoryId(request.getCategoryId());
         bill.setBillDate(request.getBillDate() != null ? request.getBillDate() : LocalDate.now());
         bill.setRemark(request.getRemark());
-        bill.setInputType(2); // 手动输入
+        bill.setInputType(2);
         billMapper.insert(bill);
         return convertToVO(bill);
     }
@@ -83,9 +79,13 @@ public class BillServiceImpl implements BillService {
     @Override
     public BillVO updateBill(Long id, BillRequest request, Long userId) {
         Bill bill = billMapper.selectById(id);
-        if (bill == null || !bill.getUserId().equals(userId)) {
-            throw new RuntimeException("账单不存在或无权限");
+        if (bill == null) {
+            throw new BusinessException(ErrorCode.BILL_NOT_FOUND);
         }
+        if (!bill.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.BILL_NO_PERMISSION);
+        }
+
         if (request.getAmount() != null) bill.setAmount(request.getAmount());
         if (request.getType() != null) bill.setType(request.getType());
         if (request.getCategoryId() != null) bill.setCategoryId(request.getCategoryId());
@@ -98,8 +98,11 @@ public class BillServiceImpl implements BillService {
     @Override
     public void deleteBill(Long id, Long userId) {
         Bill bill = billMapper.selectById(id);
-        if (bill == null || !bill.getUserId().equals(userId)) {
-            throw new RuntimeException("账单不存在或无权限");
+        if (bill == null) {
+            throw new BusinessException(ErrorCode.BILL_NOT_FOUND);
+        }
+        if (!bill.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.BILL_NO_PERMISSION);
         }
         billMapper.deleteById(id);
     }
@@ -117,8 +120,6 @@ public class BillServiceImpl implements BillService {
         wrapper.orderByDesc(Bill::getBillDate, Bill::getCreatedAt);
 
         Page<Bill> billPage = billMapper.selectPage(page, wrapper);
-
-        // 获取所有分类映射
         Map<Long, String> categoryMap = getCategoryMap();
 
         Page<BillVO> voPage = new Page<>(billPage.getCurrent(), billPage.getSize(), billPage.getTotal());
@@ -137,8 +138,11 @@ public class BillServiceImpl implements BillService {
     @Override
     public BillVO getBill(Long id, Long userId) {
         Bill bill = billMapper.selectById(id);
-        if (bill == null || !bill.getUserId().equals(userId)) {
-            throw new RuntimeException("账单不存在或无权限");
+        if (bill == null) {
+            throw new BusinessException(ErrorCode.BILL_NOT_FOUND);
+        }
+        if (!bill.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.BILL_NO_PERMISSION);
         }
         BillVO vo = convertToVO(bill);
         Map<Long, String> categoryMap = getCategoryMap();
@@ -147,11 +151,19 @@ public class BillServiceImpl implements BillService {
         return vo;
     }
 
+    private void validateBillRequest(BillRequest request) {
+        if (request.getAmount() == null || request.getAmount().doubleValue() <= 0) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "金额必须大于0");
+        }
+        if (request.getType() != null && request.getType() != 1 && request.getType() != 2) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "类型必须为1(收入)或2(支出)");
+        }
+    }
+
     private Long findCategoryIdByName(String categoryName) {
         if (categoryName == null) return null;
         LambdaQueryWrapper<Category> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Category::getName, categoryName)
-               .isNull(Category::getUserId); // 优先匹配系统预设
+        wrapper.eq(Category::getName, categoryName).isNull(Category::getUserId);
         Category category = categoryMapper.selectOne(wrapper);
         return category != null ? category.getId() : null;
     }
