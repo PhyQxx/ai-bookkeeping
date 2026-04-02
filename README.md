@@ -1,65 +1,72 @@
-# 🤖 AI 智能记账系统
+# AI 智能记账系统
 
-基于 Vue3 + Spring Boot + Spring AI 的智能记账系统，支持自然语言记账、AI 智能分类、统计分析。
+基于 Spring Boot 3 + Spring AI + Vue 3 的智能记账应用。用户可通过自然语言快速录入账单，AI 自动识别金额、分类、时间。
 
-## 🏗️ 项目结构
+## 项目结构
 
 ```
 ai-bookkeeping/
-├── backend/              # Spring Boot 后端
-│   ├── src/              # Java 源码
-│   ├── sql/              # 数据库初始化脚本
-│   ├── pom.xml           # Maven 配置
-│   ├── Dockerfile        # 后端镜像构建
-│   └── docker-compose.yml # MySQL + Redis
-├── frontend/             # Vue3 前端
-│   ├── src/              # Vue 源码
-│   ├── index.html
+├── backend/              ← 后端（Spring Boot 3）
+│   ├── src/
+│   ├── sql/
+│   ├── pom.xml
+│   ├── Dockerfile
+│   └── docker-compose.yml
+├── frontend/             ← 前端（Vue 3）
+│   ├── src/
 │   ├── package.json
 │   └── vite.config.js
-├── docs/                 # 项目文档
 ├── .gitignore
 └── README.md
 ```
 
-## 🛠️ 技术栈
+## 技术栈
 
-### 后端
-- Spring Boot 3.2 + Java 17
-- Spring AI (DeepSeek + GLM 双模型)
-- MyBatis Plus
-- Spring Security + JWT
-- Redis 缓存
-- Knife4j API 文档
+| 层级 | 技术 |
+|------|------|
+| 后端框架 | Spring Boot 3.2 + Java 17 |
+| AI 框架 | Spring AI (OpenAI 兼容协议) |
+| AI 模型 | DeepSeek + 智谱GLM（双模型策略，自动降级） |
+| ORM | MyBatis Plus 3.5 |
+| 数据库 | MySQL 8.x |
+| 缓存 | Redis 7.x |
+| 认证 | Spring Security + JWT |
+| API 文档 | Knife4j 4.x |
+| 前端框架 | Vue 3 + TypeScript + Vite 5 |
+| UI 组件 | Element Plus |
+| 状态管理 | Pinia |
+| 图表 | ECharts |
 
-### 前端
-- Vue 3 (Composition API)
-- Vite 5
-- Element Plus
-- Pinia + Vue Router
-- ECharts
-- Axios
+## 功能模块
 
-## 🚀 快速开始
+- **用户模块**：注册、登录、登出、个人信息管理
+- **AI 记账**：自然语言 → 结构化账单（"今天午饭35元" → 自动解析）
+- **手动记账**：传统表单录入
+- **分类管理**：系统预设 22 个分类 + 自定义分类
+- **统计分析**：月度总览、分类占比饼图、收支趋势折线图
+- **个人中心**：信息修改、密码修改
+
+## 快速开始
 
 ### 后端
 
 ```bash
 cd backend
 
-# 启动 MySQL + Redis
+# 1. 启动依赖服务（MySQL + Redis）
 docker-compose up -d
 
-# 配置 API Key
-# 编辑 src/main/resources/application-dev.yml
-# 填入 DEEPSEEK_API_KEY 和 GLM_API_KEY
+# 2. 配置 AI API Key（编辑 src/main/resources/application-dev.yml）
+#    spring.ai.openai.api-key=your-deepseek-key
+#    glm.api-key=your-glm-key
 
-# 编译运行
+# 3. 构建运行
 mvn clean package -DskipTests
 java -jar target/ai-bookkeeping-1.0.0-SNAPSHOT.jar
-```
 
-后端启动后访问 http://localhost:8080/doc.html 查看 API 文档。
+# 4. 访问 API 文档
+# http://localhost:8080/doc.html
+```
 
 ### 前端
 
@@ -67,22 +74,27 @@ java -jar target/ai-bookkeeping-1.0.0-SNAPSHOT.jar
 cd frontend
 npm install
 npm run dev
+
+# 访问 http://localhost:5173
 ```
 
-前端启动后访问 http://localhost:3000。
+## API 接口
 
-## 📡 API 接口
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| POST | /api/auth/register | 用户注册 | ❌ |
+| POST | /api/auth/login | 用户登录 | ❌ |
+| POST | /api/bill/ai-parse | AI 记账 | ✅ |
+| POST | /api/bill | 手动创建账单 | ✅ |
+| GET | /api/bill/list | 账单列表 | ✅ |
+| PUT | /api/bill/{id} | 更新账单 | ✅ |
+| DELETE | /api/bill/{id} | 删除账单 | ✅ |
+| GET | /api/category/list | 分类列表 | ✅ |
+| POST | /api/category | 创建分类 | ✅ |
+| GET | /api/stat/monthly | 月度总览 | ✅ |
+| GET | /api/stat/category-ratio | 分类占比 | ✅ |
+| GET | /api/stat/trend | 消费趋势 | ✅ |
 
-| 模块 | 路径 | 说明 |
-|------|------|------|
-| 认证 | POST /api/auth/register | 用户注册 |
-| 认证 | POST /api/auth/login | 用户登录 |
-| AI记账 | POST /api/bill/ai-parse | AI 解析自然语言 |
-| 账单 | POST /api/bill | 创建账单 |
-| 账单 | GET /api/bill/list | 账单列表 |
-| 分类 | GET /api/category/list | 分类列表 |
-| 统计 | GET /api/stat/monthly | 月度统计 |
-
-## 📄 License
+## License
 
 MIT
