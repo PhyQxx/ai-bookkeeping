@@ -73,3 +73,16 @@ INSERT INTO `category` (`user_id`, `name`, `type`, `icon`, `sort_order`) VALUES
 (NULL, '报销', 1, 'reimburse', 5),
 (NULL, '退款', 1, 'refund', 6),
 (NULL, '其他', 1, 'other', 7);
+
+-- 预算表
+CREATE TABLE IF NOT EXISTS `budget` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` BIGINT NOT NULL COMMENT '关联用户',
+    `category_id` BIGINT DEFAULT NULL COMMENT 'NULL=月度总预算, 非NULL=分类预算',
+    `amount` DECIMAL(12,2) NOT NULL COMMENT '预算金额',
+    `month` VARCHAR(7) NOT NULL COMMENT '预算月份（如 2026-04）',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    INDEX `idx_user_month` (`user_id`, `month`),
+    INDEX `idx_category_id` (`category_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='预算表';
