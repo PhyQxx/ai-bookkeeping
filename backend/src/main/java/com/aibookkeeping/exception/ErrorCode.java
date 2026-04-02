@@ -17,6 +17,7 @@ public enum ErrorCode {
     UNAUTHORIZED(401, "未认证"),
     FORBIDDEN(403, "无权限"),
     NOT_FOUND(404, "资源不存在"),
+    RATE_LIMITED(429, "请求频率过高，请稍后再试"),
     INTERNAL_ERROR(500, "服务器内部错误"),
 
     // 认证 10xx
@@ -32,6 +33,8 @@ public enum ErrorCode {
     BILL_NO_PERMISSION(2002, "无权限操作此账单"),
     AI_PARSE_FAILED(2003, "AI解析失败，请尝试更详细的描述或手动输入"),
     AI_PARSE_AMOUNT_INVALID(2004, "AI解析金额无效"),
+    BILL_BATCH_DELETE_EMPTY(2005, "请选择要删除的账单"),
+    AI_PARSE_PREVIEW_FAILED(2006, "AI解析预览失败"),
 
     // 分类 30xx
     CATEGORY_NOT_FOUND(3001, "分类不存在"),

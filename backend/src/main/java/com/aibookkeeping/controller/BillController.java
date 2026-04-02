@@ -1,9 +1,11 @@
 package com.aibookkeeping.controller;
 
+import com.aibookkeeping.dto.AiConfirmRequest;
 import com.aibookkeeping.dto.AiParseRequest;
 import com.aibookkeeping.dto.BillRequest;
 import com.aibookkeeping.exception.Result;
 import com.aibookkeeping.service.bill.BillService;
+import com.aibookkeeping.vo.AiParsePreviewVO;
 import com.aibookkeeping.vo.AiParseVO;
 import com.aibookkeeping.vo.BillVO;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -31,6 +33,24 @@ public class BillController {
         Long userId = (Long) authentication.getPrincipal();
         AiParseVO result = billService.aiParseAndCreate(request, userId);
         return Result.success(result);
+    }
+
+    @PostMapping("/ai-parse-preview")
+    @Operation(summary = "AI 解析预览（不入库）")
+    public Result<AiParsePreviewVO> aiParsePreview(@Valid @RequestBody AiParseRequest request,
+                                                    Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        AiParsePreviewVO result = billService.aiParsePreview(request, userId);
+        return Result.success(result);
+    }
+
+    @PostMapping("/ai-confirm")
+    @Operation(summary = "确认 AI 解析结果并创建账单")
+    public Result<BillVO> aiConfirm(@Valid @RequestBody AiConfirmRequest request,
+                                     Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        BillVO vo = billService.aiConfirmCreate(request, userId);
+        return Result.success(vo);
     }
 
     @PostMapping

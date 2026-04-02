@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { Result, AiParseVO, AiParseRequest, Bill, BillRequest, Page } from '@/types'
+import type { Result, AiParseVO, AiParsePreviewVO, AiConfirmRequest, AiParseRequest, Bill, BillRequest, Page } from '@/types'
 
 export function aiParseBill(data: AiParseRequest) {
   return request.post<any, Result<AiParseVO>>('/bill/ai-parse', data)
@@ -38,4 +38,12 @@ export function getBillDetail(id: number) {
 
 export function batchDeleteBills(ids: number[]) {
   return request.delete<any, Result<void>>('/bill/batch', { data: { ids } })
+}
+
+export function aiParsePreview(input: string) {
+  return request.post<any, Result<AiParsePreviewVO>>('/bill/ai-parse-preview', { input })
+}
+
+export function aiConfirmBill(data: AiConfirmRequest) {
+  return request.post<any, Result<Bill>>('/bill/ai-confirm', data)
 }

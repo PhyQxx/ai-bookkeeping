@@ -15,6 +15,11 @@
     </el-tabs>
 
     <el-table :data="categories" stripe style="width: 100%;">
+      <template #empty>
+        <el-empty description="暂无自定义分类">
+          <el-button type="primary" @click="showAddDialog = true">添加分类</el-button>
+        </el-empty>
+      </template>
       <el-table-column prop="name" label="分类名称" />
       <el-table-column prop="icon" label="图标" width="100" />
       <el-table-column prop="sortOrder" label="排序" width="80" />

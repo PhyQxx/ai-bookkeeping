@@ -2,6 +2,7 @@ package com.aibookkeeping.service.bill;
 
 import com.aibookkeeping.ai.model.BillParseResult;
 import com.aibookkeeping.ai.service.AiService;
+import com.aibookkeeping.dto.AiConfirmRequest;
 import com.aibookkeeping.dto.AiParseRequest;
 import com.aibookkeeping.dto.BillRequest;
 import com.aibookkeeping.entity.Bill;
@@ -10,6 +11,7 @@ import com.aibookkeeping.exception.BusinessException;
 import com.aibookkeeping.exception.ErrorCode;
 import com.aibookkeeping.mapper.BillMapper;
 import com.aibookkeeping.mapper.CategoryMapper;
+import com.aibookkeeping.vo.AiParsePreviewVO;
 import com.aibookkeeping.vo.AiParseVO;
 import com.aibookkeeping.vo.BillVO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -58,6 +60,54 @@ public class BillServiceImpl implements BillService {
                 .remark(result.getRemark())
                 .billId(bill.getId())
                 .build();
+    }
+
+    @Override
+    public AiParsePreviewVO aiParsePreview(AiParseRequest request, Long userId) {
+        BillParseResult result;
+        try {
+            result = aiService.parseBillInput(request.getInput(), userId);
+        } catch (BusinessException e) {
+            throw new BusinessException(ErrorCode.AI_PARSE_PREVIEW_FAILED);
+        }
+
+        Long categoryId = findCategoryIdByName(result.getCategory());
+
+        // 获取候选分类列表
+        List<AiParsePreviewVO.CategoryCandidate> candidates = categoryMapper.selectList(null).stream()
+                .map(c -> AiParsePreviewVO.CategoryCandidate.builder()
+                        .id(c.getId())
+                        .name(c.getName())
+                        .type(c.getType())
+                        .build())
+                .collect(Collectors.toList());
+
+        return AiParsePreviewVO.builder()
+                .amount(result.getAmount().abs())
+                .category(result.getCategory())
+                .categoryId(categoryId)
+                .date(result.getDate() != null ? result.getDate().toString() : LocalDate.now().toString())
+                .remark(result.getRemark())
+                .candidates(candidates)
+                .build();
+    }
+
+    @Override
+    public BillVO aiConfirmCreate(AiConfirmRequest request, Long userId) {
+        Bill bill = new Bill();
+        bill.setUserId(userId);
+        bill.setAmount(request.getAmount());
+        bill.setType(request.getType());
+        bill.setCategoryId(request.getCategoryId());
+        bill.setBillDate(LocalDate.parse(request.getDate()));
+        bill.setRemark(request.getRemark());
+        bill.setInputType(1);
+        billMapper.insert(bill);
+        BillVO vo = convertToVO(bill);
+        Map<Long, String> categoryMap = getCategoryMap();
+        vo.setCategoryName(categoryMap.getOrDefault(bill.getCategoryId(), "未分类"));
+        vo.setTypeName(bill.getType() == 1 ? "收入" : "支出");
+        return vo;
     }
 
     @Override

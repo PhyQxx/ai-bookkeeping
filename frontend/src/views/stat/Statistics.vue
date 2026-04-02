@@ -53,6 +53,7 @@
             <span>支出分类占比</span>
           </template>
           <div ref="pieChartRef" style="height: 350px;"></div>
+          <el-empty v-if="!categoryRatios.length" description="暂无支出数据" style="margin-top: -200px;" />
         </el-card>
       </el-col>
       <el-col :span="12">
@@ -61,6 +62,7 @@
             <span>收支趋势（近6个月）</span>
           </template>
           <div ref="lineChartRef" style="height: 350px;"></div>
+          <el-empty v-if="!trendData.length" description="暂无趋势数据" style="margin-top: -200px;" />
         </el-card>
       </el-col>
     </el-row>

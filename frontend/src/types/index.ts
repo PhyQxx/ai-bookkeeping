@@ -62,6 +62,27 @@ export interface AiParseRequest {
   input: string
 }
 
+/** AI 解析预览响应 */
+export interface AiParsePreviewVO {
+  success: boolean
+  amount?: number
+  category?: string
+  categoryId?: number
+  date?: string
+  remark?: string
+  errorMessage?: string
+  candidateCategories?: { id: number; name: string }[]
+}
+
+/** AI 确认记账请求 */
+export interface AiConfirmRequest {
+  amount: number
+  type: number
+  categoryId: number
+  date: string
+  remark?: string
+}
+
 /** AI 解析响应 */
 export interface AiParseVO {
   success: boolean

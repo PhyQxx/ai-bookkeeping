@@ -1,7 +1,9 @@
 package com.aibookkeeping.service.bill;
 
+import com.aibookkeeping.dto.AiConfirmRequest;
 import com.aibookkeeping.dto.AiParseRequest;
 import com.aibookkeeping.dto.BillRequest;
+import com.aibookkeeping.vo.AiParsePreviewVO;
 import com.aibookkeeping.vo.AiParseVO;
 import com.aibookkeeping.vo.BillVO;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -11,6 +13,10 @@ import java.util.List;
 public interface BillService {
 
     AiParseVO aiParseAndCreate(AiParseRequest request, Long userId);
+
+    AiParsePreviewVO aiParsePreview(AiParseRequest request, Long userId);
+
+    BillVO aiConfirmCreate(AiConfirmRequest request, Long userId);
 
     BillVO createBill(BillRequest request, Long userId);
 

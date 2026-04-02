@@ -1,6 +1,13 @@
 import axios from 'axios'
 import type { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
+
+// 扩展 AxiosRequestConfig 添加重试计数
+declare module 'axios' {
+  interface InternalAxiosRequestConfig {
+    __retryCount?: number
+  }
+}
 
 const request = axios.create({
   baseURL: '/api',
@@ -11,12 +18,20 @@ const request = axios.create({
 let isRefreshing = false
 let pendingRequests: Array<(token: string) => void> = []
 
-// 请求拦截器：自动携带 accessToken
+// 网络异常自动重试配置
+const MAX_RETRY = 2
+const RETRY_DELAY = 1000
+const RETRYABLE_STATUS = [408, 429, 500, 502, 503, 504]
+const RETRYABLE_ERRORS = ['ECONNABORTED', 'ECONNRESET', 'ETIMEDOUT', 'ERR_NETWORK']
+
+// 请求拦截器：自动携带 accessToken + 初始化重试计数
 request.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem('accessToken')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  // 初始化重试计数
+  config.__retryCount = 0
   return config
 })
 
@@ -34,10 +49,43 @@ request.interceptors.response.use(
     return res
   },
   (error) => {
-    if (error.response?.status === 401) {
-      return handleUnauthorized(error.config)
+    const config = error.config
+    const retryCount = config?.__retryCount || 0
+
+    // 网络断开检测（不重试）
+    if (!navigator.onLine) {
+      ElNotification.error({ title: '网络已断开', message: '请检查网络连接后重试', duration: 0 })
+      return Promise.reject(error)
     }
-    ElMessage.error(error.response?.data?.message || '网络错误')
+
+    // 401 走 token 刷新逻辑（不重试）
+    if (error.response?.status === 401) {
+      return handleUnauthorized(config)
+    }
+
+    // 判断是否可重试
+    const isRetryable =
+      retryCount < MAX_RETRY &&
+      (RETRYABLE_STATUS.includes(error.response?.status) || RETRYABLE_ERRORS.includes(error.code))
+
+    if (isRetryable) {
+      config.__retryCount = retryCount + 1
+      console.warn(`请求重试 (${config.__retryCount}/${MAX_RETRY}): ${config.url}`)
+      return new Promise(resolve => {
+        setTimeout(() => resolve(request(config)), RETRY_DELAY * retryCount)
+      })
+    }
+
+    // 超过重试次数，显示最终错误
+    if (error.code === 'ECONNABORTED') {
+      ElMessage.error('请求超时，请检查网络')
+    } else if (error.response?.status >= 500) {
+      ElMessage.error('服务器异常，请稍后重试')
+    } else if (error.response?.status === 429) {
+      ElMessage.error('请求频率过高，请稍后再试')
+    } else {
+      ElMessage.error(error.response?.data?.message || '网络错误')
+    }
     return Promise.reject(error)
   }
 )
