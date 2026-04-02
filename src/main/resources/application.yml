@@ -1,0 +1,81 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ai-bookkeeping
+
+  # MySQL 数据源
+  datasource:
+    url: jdbc:mysql://localhost:3306/ai_bookkeeping?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: ${MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # Redis
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+      timeout: 5000ms
+
+  # Spring AI - DeepSeek (默认，兼容 OpenAI 协议)
+  ai:
+    openai:
+      api-key: ${DEEPSEEK_API_KEY:your-deepseek-api-key}
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+      chat:
+        options:
+          model: ${DEEPSEEK_MODEL:deepseek-chat}
+          temperature: 0.3
+
+# MyBatis Plus
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.aibookkeeping.entity
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# JWT 配置
+jwt:
+  secret: ${JWT_SECRET:mySecretKeyForAIBookkeepingSystem2024MustBeLongEnough}
+  expiration: 604800000  # 7天（毫秒）
+
+# Knife4j
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+# 智谱GLM 配置（备用模型，通过代码动态切换）
+glm:
+  api-key: ${GLM_API_KEY:your-glm-api-key}
+  base-url: ${GLM_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
+  model: ${GLM_MODEL:glm-4}
+
+# AI 缓存配置
+ai:
+  cache:
+    expire-minutes: 5
+  rate-limit:
+    max-requests: 20
+    window-minutes: 1
+
+logging:
+  level:
+    com.aibookkeeping: debug
+    org.springframework.ai: debug

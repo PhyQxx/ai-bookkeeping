@@ -1,0 +1,33 @@
+# Dependencies
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Build
+build/
+
+# Env
+.env
+.env.local
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
