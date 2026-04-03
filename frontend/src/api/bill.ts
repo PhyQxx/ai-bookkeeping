@@ -1,20 +1,17 @@
 import request from '@/utils/request'
-import type { Result, AiParseVO, AiParsePreviewVO, AiConfirmRequest, AiParseRequest, Bill, BillRequest, Page } from '@/types'
+import type { Result, Page, Bill } from '@/types'
 
-export function aiParseBill(data: AiParseRequest) {
-  return request.post<any, Result<AiParseVO>>('/bill/ai-parse', data)
-}
-
-export function createBill(data: BillRequest) {
-  return request.post<any, Result<Bill>>('/bill', data)
-}
-
-export function updateBill(id: number, data: BillRequest) {
-  return request.put<any, Result<Bill>>(`/bill/${id}`, data)
-}
-
-export function deleteBill(id: number) {
-  return request.delete<any, Result<void>>(`/bill/${id}`)
+export function exportBills(params: {
+  startDate?: string
+  endDate?: string
+  categoryId?: number
+  type?: number
+  format?: string
+}) {
+  return request.get('/bills/export', {
+    params: { ...params },
+    responseType: 'blob'
+  })
 }
 
 export function listBills(params: {
@@ -26,6 +23,18 @@ export function listBills(params: {
   pageSize?: number
 }) {
   return request.get<any, Result<Page<Bill>>>('/bill/list', { params })
+}
+
+export function createBill(data: any) {
+  return request.post<any, Result<Bill>>('/bill', data)
+}
+
+export function updateBill(id: number, data: any) {
+  return request.put<any, Result<Bill>>(`/bill/${id}`, data)
+}
+
+export function deleteBill(id: number) {
+  return request.delete<any, Result<void>>(`/bill/${id}`)
 }
 
 export function getBill(id: number) {
@@ -40,10 +49,14 @@ export function batchDeleteBills(ids: number[]) {
   return request.delete<any, Result<void>>('/bill/batch', { data: { ids } })
 }
 
-export function aiParsePreview(input: string) {
-  return request.post<any, Result<AiParsePreviewVO>>('/bill/ai-parse-preview', { input })
+export function aiParseBill(data: any) {
+  return request.post<any, Result<any>>('/bill/ai-parse', data)
 }
 
-export function aiConfirmBill(data: AiConfirmRequest) {
+export function aiParsePreview(input: string) {
+  return request.post<any, Result<any>>('/bill/ai-parse-preview', { input })
+}
+
+export function aiConfirmBill(data: any) {
   return request.post<any, Result<Bill>>('/bill/ai-confirm', data)
 }

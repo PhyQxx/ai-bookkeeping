@@ -17,6 +17,55 @@ const request = axios.create({
 // Token 刷新相关状态
 let isRefreshing = false
 let pendingRequests: Array<(token: string) => void> = []
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
+
+// M5-09: Token 过期前 5 分钟自动刷新
+function scheduleTokenRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  try {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    const exp = payload.exp * 1000 // ms
+    const now = Date.now()
+    const refreshAt = exp - 5 * 60 * 1000 // 5 min before expiry
+    if (refreshAt <= now) {
+      // Already near expiry, refresh now
+      proactiveRefresh()
+    } else {
+      refreshTimer = setTimeout(proactiveRefresh, refreshAt - now)
+    }
+  } catch {
+    // Invalid token, ignore
+  }
+}
+
+function proactiveRefresh() {
+  const refreshToken = localStorage.getItem('refreshToken')
+  if (!refreshToken) return
+  if (isRefreshing) return
+  isRefreshing = true
+  axios.post('/api/auth/refresh', { refreshToken })
+    .then(res => {
+      const data = res.data
+      if (data.code === 200 && data.data) {
+        const newToken = data.data.accessToken || data.data.token
+        const newRefresh = data.data.refreshToken || refreshToken
+        localStorage.setItem('accessToken', newToken)
+        localStorage.setItem('refreshToken', newRefresh)
+        scheduleTokenRefresh()
+      }
+    })
+    .catch(() => {})
+    .finally(() => { isRefreshing = false })
+}
+
+// Initial schedule
+scheduleTokenRefresh()
+// Re-schedule on visibility change
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') scheduleTokenRefresh()
+})
 
 // 网络异常自动重试配置
 const MAX_RETRY = 2

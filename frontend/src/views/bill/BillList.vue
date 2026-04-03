@@ -28,6 +28,7 @@
         <el-form-item>
           <el-button type="primary" @click="loadBills">查询</el-button>
           <el-button @click="resetFilters">重置</el-button>
+          <el-button type="success" @click="showExportDialog = true">📥 导出</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -45,8 +46,14 @@
       </el-alert>
     </div>
 
+    <!-- M5-08: 骨架屏 -->
+    <template v-if="loading && bills.length === 0">
+      <el-skeleton :rows="6" animated />
+    </template>
+
     <!-- 账单表格 -->
     <el-table
+      v-else
       :data="bills"
       stripe
       v-loading="loading"
@@ -153,12 +160,43 @@
         <el-descriptions-item label="创建时间">{{ detailBill.createdAt }}</el-descriptions-item>
       </el-descriptions>
     </el-dialog>
+
+    <!-- 导出弹窗 -->
+    <el-dialog v-model="showExportDialog" title="导出账单" width="480px">
+      <el-form :model="exportForm" label-width="80px">
+        <el-form-item label="时间范围">
+          <el-date-picker v-model="exportForm.dateRange" type="daterange" range-separator="至"
+            start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="分类">
+          <el-select v-model="exportForm.categoryId" placeholder="全部" clearable style="width: 100%;">
+            <el-option v-for="cat in categories" :key="cat.id" :label="cat.name" :value="cat.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="类型">
+          <el-select v-model="exportForm.type" placeholder="全部" clearable style="width: 100%;">
+            <el-option label="支出" :value="2" />
+            <el-option label="收入" :value="1" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="格式">
+          <el-radio-group v-model="exportForm.format">
+            <el-radio value="excel">Excel (.xlsx)</el-radio>
+            <el-radio value="csv">CSV</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showExportDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleExport" :loading="exportLoading">导出</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { listBills, updateBill, deleteBill, getBillDetail, batchDeleteBills } from '@/api/bill'
+import { listBills, updateBill, deleteBill, getBillDetail, batchDeleteBills, exportBills } from '@/api/bill'
 import { listCategories } from '@/api/category'
 import type { Bill, Category } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -262,10 +300,54 @@ const handleUpdate = async () => {
 
 const handleDelete = async (id: number) => {
   try {
+    await ElMessageBox.confirm(
+      '确定要删除这条账单吗？删除后不可恢复。',
+      '删除确认',
+      { type: 'warning', confirmButtonText: '确定删除', cancelButtonText: '取消', confirmButtonClass: 'el-button--danger' }
+    )
     await deleteBill(id)
     ElMessage.success('删除成功')
     loadBills()
-  } catch (e) {}
+  } catch {
+    // cancelled
+  }
+}
+
+// 导出
+const showExportDialog = ref(false)
+const exportLoading = ref(false)
+const exportForm = reactive({
+  dateRange: null as string[] | null,
+  categoryId: undefined as number | undefined,
+  type: undefined as number | undefined,
+  format: 'excel'
+})
+
+const handleExport = async () => {
+  exportLoading.value = true
+  try {
+    const params: any = { format: exportForm.format }
+    if (exportForm.dateRange?.[0]) params.startDate = exportForm.dateRange[0]
+    if (exportForm.dateRange?.[1]) params.endDate = exportForm.dateRange[1]
+    if (exportForm.categoryId) params.categoryId = exportForm.categoryId
+    if (exportForm.type) params.type = exportForm.type
+    const res = await exportBills(params)
+    const blob = new Blob([res as any], {
+      type: exportForm.format === 'csv' ? 'text/csv;charset=utf-8' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `bills_export.${exportForm.format === 'csv' ? 'csv' : 'xlsx'}`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    showExportDialog.value = false
+    ElMessage.success('导出成功')
+  } catch {
+    ElMessage.error('导出失败')
+  } finally {
+    exportLoading.value = false
+  }
 }
 
 const handleBatchDelete = async () => {

@@ -159,7 +159,8 @@
     </el-dialog>
 
     <!-- 最近账单列表 -->
-    <el-table :data="recentBills" stripe style="width: 100%;" v-loading="billsLoading">
+    <el-table :data="recentBills" stripe style="width: 100%;" v-loading="billsLoading"
+      :row-class-name="({ row }: { row: Bill }) => row.id === highlightId ? 'highlight-row' : ''">
       <template #empty>
         <el-empty description="暂无账单记录" />
       </template>
@@ -214,6 +215,7 @@ const confirmForm = reactive({
 })
 
 const recentBills = ref<Bill[]>([])
+const highlightId = ref<number | null>(null) // M5-05: highlight new bill
 const categories = ref<Category[]>([])
 const monthStats = ref<MonthlyStat | null>(null)
 const billsLoading = ref(false)
@@ -335,9 +337,15 @@ const handleAiConfirm = async () => {
       remark: confirmForm.remark
     }
     await aiConfirmBill(data)
-    ElMessage.success('记账成功！')
+    ElMessage({ message: '✅ 记账成功！', type: 'success', duration: 2000, showClose: true })
     showPreview.value = false
-    loadRecentBills()
+    await loadRecentBills()
+    // M5-05: highlight new bill
+    const newBill = recentBills.value[0]
+    if (newBill) {
+      highlightId.value = newBill.id
+      setTimeout(() => { highlightId.value = null }, 2000)
+    }
     loadBudgetUsage()
     setTimeout(checkOverspend, 1000)
   } catch (e) {
@@ -355,12 +363,18 @@ const handleManualCreate = async () => {
   manualLoading.value = true
   try {
     await createBill(manualForm)
-    ElMessage.success('记账成功！')
+    ElMessage({ message: '✅ 记账成功！', type: 'success', duration: 2000, showClose: true })
     showManualDialog.value = false
     manualForm.amount = 0
     manualForm.categoryId = undefined
     manualForm.remark = ''
-    loadRecentBills()
+    await loadRecentBills()
+    // M5-05: highlight new bill
+    const newBill = recentBills.value[0]
+    if (newBill) {
+      highlightId.value = newBill.id
+      setTimeout(() => { highlightId.value = null }, 2000)
+    }
     loadBudgetUsage()
     setTimeout(checkOverspend, 1000)
   } catch (e) {
@@ -411,3 +425,17 @@ onMounted(() => {
   loadBudgetUsage()
 })
 </script>
+
+<style scoped>
+/* M5-05: Highlight animation for new bill */
+:deep(.highlight-row) {
+  background-color: #e1f3d8 !important;
+  transition: background-color 0.5s ease;
+  animation: highlightPulse 2s ease-out forwards;
+}
+@keyframes highlightPulse {
+  0% { background-color: #b3e19d; }
+  50% { background-color: #e1f3d8; }
+  100% { background-color: transparent; }
+}
+</style>
