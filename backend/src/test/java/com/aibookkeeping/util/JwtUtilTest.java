@@ -14,7 +14,8 @@ class JwtUtilTest {
     void setUp() {
         jwtUtil = new JwtUtil();
         ReflectionTestUtils.setField(jwtUtil, "secret", "myTestSecretKeyForAIBookkeepingSystem2024MustBeLongEnoughForHS256");
-        ReflectionTestUtils.setField(jwtUtil, "expiration", 604800000L);
+        ReflectionTestUtils.setField(jwtUtil, "accessExpiration", 604800000L);
+        ReflectionTestUtils.setField(jwtUtil, "refreshExpiration", 604800000L);
     }
 
     @Test
