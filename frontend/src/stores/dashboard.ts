@@ -44,7 +44,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   // Stale-while-revalidate: return cached data, refresh in background
   async function loadAllSWR() {
-    if (!force && summary.value) {
+    if (summary.value) {
       // Return cached, refresh in background
       loadAll(true)
       return
