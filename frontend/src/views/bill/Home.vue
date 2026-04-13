@@ -9,8 +9,8 @@
         </div>
       </template>
       <div style="margin-bottom: 8px; display: flex; justify-content: space-between;">
-        <span>总预算: ¥{{ budgetUsage.totalBudget.toFixed(2) }}</span>
-        <span>已使用: ¥{{ budgetUsage.totalUsed.toFixed(2) }}</span>
+        <span>总预算: ¥{{ budgetUsage.totalBudget?.toFixed(2) }}</span>
+        <span>已使用: ¥{{ budgetUsage.totalUsed?.toFixed(2) }}</span>
       </div>
       <el-progress
         :percentage="budgetPercentage"

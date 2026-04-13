@@ -1,56 +1,78 @@
 package com.aibookkeeping.util;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey;
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
-import java.util.Date;
-import java.util.Map;
+import java.security.SecureRandom;
+import java.util.Base64;
 
+@Slf4j
 @Component
 public class JwtUtil {
+
+    private static final String ALGORITHM = "AES/GCM/NoPadding";
+    private static final int IV_LENGTH = 12;
+    private static final int TAG_LENGTH = 128;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final SecureRandom secureRandom = new SecureRandom();
 
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.access-expiration:7200000}")
-    private long accessExpiration; // 默认 2 小时
-
-    @Value("${jwt.refresh-expiration:604800000}")
-    private long refreshExpiration; // 默认 7 天
-
-    private SecretKey getKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    private SecretKeySpec getKey() {
+        byte[] keyBytes = new byte[32];
+        byte[] secretBytes = secret.getBytes(StandardCharsets.UTF_8);
+        System.arraycopy(secretBytes, 0, keyBytes, 0, Math.min(secretBytes.length, 32));
+        return new SecretKeySpec(keyBytes, "AES");
     }
 
-    /**
-     * 生成 Access Token（2小时）
-     */
+    private String encrypt(TokenInfo info) {
+        try {
+            byte[] iv = new byte[IV_LENGTH];
+            secureRandom.nextBytes(iv);
+            Cipher cipher = Cipher.getInstance(ALGORITHM);
+            cipher.init(Cipher.ENCRYPT_MODE, getKey(), new GCMParameterSpec(TAG_LENGTH, iv));
+            byte[] jsonBytes = objectMapper.writeValueAsBytes(info);
+            byte[] cipherBytes = cipher.doFinal(jsonBytes);
+            byte[] combined = new byte[iv.length + cipherBytes.length];
+            System.arraycopy(iv, 0, combined, 0, iv.length);
+            System.arraycopy(cipherBytes, 0, combined, iv.length, cipherBytes.length);
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(combined);
+        } catch (Exception e) {
+            throw new RuntimeException("Token 加密失败", e);
+        }
+    }
+
+    private TokenInfo decrypt(String token) {
+        try {
+            byte[] combined = Base64.getUrlDecoder().decode(token);
+            byte[] iv = new byte[IV_LENGTH];
+            byte[] cipherBytes = new byte[combined.length - IV_LENGTH];
+            System.arraycopy(combined, 0, iv, 0, IV_LENGTH);
+            System.arraycopy(combined, IV_LENGTH, cipherBytes, 0, cipherBytes.length);
+            Cipher cipher = Cipher.getInstance(ALGORITHM);
+            cipher.init(Cipher.DECRYPT_MODE, getKey(), new GCMParameterSpec(TAG_LENGTH, iv));
+            byte[] jsonBytes = cipher.doFinal(cipherBytes);
+            return objectMapper.readValue(jsonBytes, TokenInfo.class);
+        } catch (Exception e) {
+            log.debug("Token 解密失败: {}", e.getMessage());
+            return null;
+        }
+    }
+
     public String generateAccessToken(Long userId, String username) {
-        return Jwts.builder()
-                .claims(Map.of("userId", userId, "username", username, "type", "access"))
-                .subject(username)
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + accessExpiration))
-                .signWith(getKey())
-                .compact();
+        return encrypt(new TokenInfo(userId, username, "access"));
     }
 
-    /**
-     * 生成 Refresh Token（7天）
-     */
     public String generateRefreshToken(Long userId, String username) {
-        return Jwts.builder()
-                .claims(Map.of("userId", userId, "username", username, "type", "refresh"))
-                .subject(username)
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + refreshExpiration))
-                .signWith(getKey())
-                .compact();
+        return encrypt(new TokenInfo(userId, username, "refresh"));
     }
 
     /**
@@ -60,61 +82,33 @@ public class JwtUtil {
         return generateAccessToken(userId, username);
     }
 
-    /**
-     * 解析 Token
-     */
-    public Claims parseToken(String token) {
-        return Jwts.parser()
-                .verifyWith(getKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+    public TokenInfo parseToken(String token) {
+        return decrypt(token);
     }
 
-    /**
-     * 从 Token 中获取用户ID
-     */
     public Long getUserId(String token) {
-        Claims claims = parseToken(token);
-        return claims.get("userId", Long.class);
+        TokenInfo info = decrypt(token);
+        return info != null ? info.userId : null;
     }
 
-    /**
-     * 从 Token 中获取用户名
-     */
     public String getUsername(String token) {
-        Claims claims = parseToken(token);
-        return claims.getSubject();
+        TokenInfo info = decrypt(token);
+        return info != null ? info.username : null;
     }
 
-    /**
-     * 获取 Token 类型（access / refresh）
-     */
     public String getTokenType(String token) {
-        Claims claims = parseToken(token);
-        return claims.get("type", String.class);
+        TokenInfo info = decrypt(token);
+        return info != null ? info.type : null;
     }
 
-    /**
-     * 判断是否为 Refresh Token
-     */
     public boolean isRefreshToken(String token) {
-        try {
-            return "refresh".equals(getTokenType(token));
-        } catch (Exception e) {
-            return false;
-        }
+        return "refresh".equals(getTokenType(token));
     }
 
-    /**
-     * 验证 Token 是否有效
-     */
     public boolean validateToken(String token) {
-        try {
-            parseToken(token);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+        return decrypt(token) != null;
+    }
+
+    public record TokenInfo(Long userId, String username, String type) {
     }
 }
