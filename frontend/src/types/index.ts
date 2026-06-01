@@ -32,6 +32,16 @@ export interface LoginVO {
   username: string
   nickname: string
   avatar: string
+  currentLedgerId?: number
+}
+
+/** 账本 */
+export interface Ledger {
+  id: number
+  name: string
+  description?: string
+  isDefault: number
+  createdAt: string
 }
 
 /** 账单 */
@@ -137,6 +147,17 @@ export interface TrendItem {
   expense: number
 }
 
+/** 年度统计 */
+export interface YearlyStat {
+  year: string
+  totalIncome: number
+  totalExpense: number
+  balance: number
+  billCount: number
+  monthlyDetails: MonthlyStat[]
+  categoryBreakdown: CategoryRatio[]
+}
+
 /** 预算 */
 export interface Budget {
   id: number
@@ -152,4 +173,22 @@ export interface BudgetUsage {
   totalBudget: number
   totalUsed: number
   items: Budget[]
+}
+
+/** 周期账单 */
+export interface RecurringBill {
+  id: number
+  amount: number
+  type: number
+  typeName: string
+  categoryId: number
+  categoryName: string
+  remark: string
+  frequency: string
+  dayOfPeriod: number
+  startDate: string
+  endDate?: string
+  lastGeneratedDate?: string
+  status: number
+  createdAt: string
 }

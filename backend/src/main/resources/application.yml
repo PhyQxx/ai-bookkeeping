@@ -80,3 +80,13 @@ logging:
   level:
     com.aibookkeeping: debug
     org.springframework.ai: debug
+
+# Management / Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

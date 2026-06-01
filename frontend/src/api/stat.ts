@@ -1,8 +1,12 @@
 import request from '@/utils/request'
-import type { Result, MonthlyStat, CategoryRatio, TrendItem } from '@/types'
+import type { Result, MonthlyStat, CategoryRatio, TrendItem, YearlyStat } from '@/types'
 
 export function getMonthlyStat(month?: string) {
   return request.get<any, Result<MonthlyStat>>('/stat/monthly', { params: { month } })
+}
+
+export function getYearlyStat(year?: string) {
+  return request.get<any, Result<YearlyStat>>('/stat/yearly', { params: { year } })
 }
 
 export function getCategoryRatio(month?: string, type?: number) {

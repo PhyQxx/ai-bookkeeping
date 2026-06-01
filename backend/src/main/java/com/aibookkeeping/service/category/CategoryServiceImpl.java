@@ -8,27 +8,48 @@ import com.aibookkeeping.mapper.CategoryMapper;
 import com.aibookkeeping.vo.CategoryVO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryMapper categoryMapper;
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    private static final String CACHE_KEY_PREFIX = "category:list:";
+    private static final long CACHE_EXPIRE_HOURS = 24;
 
     @Override
     public List<CategoryVO> listCategories(Long userId, Integer type) {
+        String cacheKey = CACHE_KEY_PREFIX + userId + ":" + (type == null ? "all" : type);
+        
+        // Try cache
+        Object cached = redisTemplate.opsForValue().get(cacheKey);
+        if (cached != null) {
+            log.debug("Category list cache hit for user: {}", userId);
+            return (List<CategoryVO>) cached;
+        }
+
         LambdaQueryWrapper<Category> wrapper = new LambdaQueryWrapper<>();
         wrapper.and(w -> w.isNull(Category::getUserId).or().eq(Category::getUserId, userId));
         if (type != null) wrapper.eq(Category::getType, type);
         wrapper.orderByAsc(Category::getSortOrder, Category::getId);
 
-        return categoryMapper.selectList(wrapper).stream()
+        List<CategoryVO> list = categoryMapper.selectList(wrapper).stream()
                 .map(this::convertToVO)
                 .collect(Collectors.toList());
+        
+        // Save to cache
+        redisTemplate.opsForValue().set(cacheKey, list, CACHE_EXPIRE_HOURS, TimeUnit.HOURS);
+        return list;
     }
 
     @Override
@@ -40,6 +61,8 @@ public class CategoryServiceImpl implements CategoryService {
         category.setIcon(request.getIcon());
         category.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0);
         categoryMapper.insert(category);
+        
+        clearCache(userId);
         return convertToVO(category);
     }
 
@@ -60,6 +83,8 @@ public class CategoryServiceImpl implements CategoryService {
         category.setIcon(request.getIcon());
         category.setSortOrder(request.getSortOrder());
         categoryMapper.updateById(category);
+        
+        clearCache(userId);
         return convertToVO(category);
     }
 
@@ -76,6 +101,17 @@ public class CategoryServiceImpl implements CategoryService {
             throw new BusinessException(ErrorCode.CATEGORY_NO_PERMISSION);
         }
         categoryMapper.deleteById(id);
+        
+        clearCache(userId);
+    }
+
+    private void clearCache(Long userId) {
+        String pattern = CACHE_KEY_PREFIX + userId + ":*";
+        java.util.Set<String> keys = redisTemplate.keys(pattern);
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+            log.debug("Cleared category cache for user: {}", userId);
+        }
     }
 
     private CategoryVO convertToVO(Category category) {

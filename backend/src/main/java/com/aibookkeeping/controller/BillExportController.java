@@ -5,10 +5,21 @@ import com.aibookkeeping.entity.Category;
 import com.aibookkeeping.mapper.BillMapper;
 import com.aibookkeeping.mapper.CategoryMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.lowagie.text.Document;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.Font;
+import com.lowagie.text.FontFactory;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.Phrase;
+import com.lowagie.text.pdf.BaseFont;
+import com.lowagie.text.pdf.PdfPCell;
+import com.lowagie.text.pdf.PdfPTable;
+import com.lowagie.text.pdf.PdfWriter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.awt.Color;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.math.BigDecimal;
@@ -61,8 +73,59 @@ public class BillExportController {
 
         if ("csv".equalsIgnoreCase(format)) {
             exportCsv(bills, categoryMap, response);
+        } else if ("pdf".equalsIgnoreCase(format)) {
+            exportPdf(bills, categoryMap, response);
         } else {
             exportExcel(bills, categoryMap, response);
+        }
+    }
+
+    private void exportPdf(List<Bill> bills, Map<Long, String> categoryMap, HttpServletResponse response) throws IOException {
+        response.setContentType("application/pdf");
+        response.setHeader("Content-Disposition", "attachment; filename=bills_report.pdf");
+
+        try (Document document = new Document()) {
+            PdfWriter.getInstance(document, response.getOutputStream());
+            document.open();
+
+            // 使用系统内置的中文字体或尝试加载
+            BaseFont bfChinese = BaseFont.createFont("STSong-Light", "UniGB-UCS2-H", BaseFont.NOT_EMBEDDED);
+            Font titleFont = new Font(bfChinese, 18, Font.BOLD);
+            Font headerFont = new Font(bfChinese, 12, Font.BOLD, Color.WHITE);
+            Font normalFont = new Font(bfChinese, 10, Font.NORMAL);
+
+            Paragraph title = new Paragraph("AI 智能记账 - 账单报告", titleFont);
+            title.setAlignment(Paragraph.ALIGN_CENTER);
+            title.setSpacingAfter(20);
+            document.add(title);
+
+            PdfPTable table = new PdfPTable(6);
+            table.setWidthPercentage(100);
+            table.setSpacingBefore(10);
+            table.setWidths(new float[]{15f, 15f, 10f, 15f, 30f, 15f});
+
+            String[] headers = {"日期", "分类", "类型", "金额", "备注", "方式"};
+            for (String header : headers) {
+                PdfPCell cell = new PdfPCell(new Phrase(header, headerFont));
+                cell.setBackgroundColor(new Color(102, 126, 234));
+                cell.setHorizontalAlignment(PdfPCell.ALIGN_CENTER);
+                cell.setPadding(5);
+                table.addCell(cell);
+            }
+
+            for (Bill bill : bills) {
+                table.addCell(new PdfPCell(new Phrase(bill.getBillDate().toString(), normalFont)));
+                table.addCell(new PdfPCell(new Phrase(categoryMap.getOrDefault(bill.getCategoryId(), "-"), normalFont)));
+                table.addCell(new PdfPCell(new Phrase(bill.getType() == 1 ? "收入" : "支出", normalFont)));
+                table.addCell(new PdfPCell(new Phrase(bill.getAmount().toString(), normalFont)));
+                table.addCell(new PdfPCell(new Phrase(bill.getRemark() != null ? bill.getRemark() : "", normalFont)));
+                table.addCell(new PdfPCell(new Phrase(bill.getInputType() == 1 ? "AI" : "手动", normalFont)));
+            }
+
+            document.add(table);
+        } catch (DocumentException e) {
+            log.error("Failed to generate PDF", e);
+            throw new IOException("PDF 生成失败");
         }
     }
 

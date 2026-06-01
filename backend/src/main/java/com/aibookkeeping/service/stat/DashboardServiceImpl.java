@@ -6,6 +6,7 @@ import com.aibookkeeping.entity.Category;
 import com.aibookkeeping.mapper.BillMapper;
 import com.aibookkeeping.mapper.BudgetMapper;
 import com.aibookkeeping.mapper.CategoryMapper;
+import com.aibookkeeping.service.ledger.LedgerService;
 import com.aibookkeeping.vo.BudgetProgressVO;
 import com.aibookkeeping.vo.CategoryRankingVO;
 import com.aibookkeeping.vo.DailyTrendVO;
@@ -30,15 +31,18 @@ public class DashboardServiceImpl implements DashboardService {
     private final BillMapper billMapper;
     private final BudgetMapper budgetMapper;
     private final CategoryMapper categoryMapper;
+    private final LedgerService ledgerService;
 
     @Override
     public MonthlyStatVO getMonthlySummary(Long userId) {
+        Long ledgerId = ledgerService.getCurrentLedgerId(userId);
         YearMonth now = YearMonth.now();
         LocalDate startDate = now.atDay(1);
         LocalDate endDate = now.atEndOfMonth();
 
         LambdaQueryWrapper<Bill> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Bill::getUserId, userId)
+               .eq(Bill::getLedgerId, ledgerId)
                .ge(Bill::getBillDate, startDate)
                .le(Bill::getBillDate, endDate);
 
@@ -63,11 +67,13 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public List<DailyTrendVO> getRecentTrend(Long userId) {
+        Long ledgerId = ledgerService.getCurrentLedgerId(userId);
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusDays(29);
 
         LambdaQueryWrapper<Bill> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Bill::getUserId, userId)
+               .eq(Bill::getLedgerId, ledgerId)
                .ge(Bill::getBillDate, startDate)
                .le(Bill::getBillDate, endDate)
                .orderByAsc(Bill::getBillDate);
@@ -91,12 +97,14 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public List<CategoryRankingVO> getCategoryRanking(Long userId) {
+        Long ledgerId = ledgerService.getCurrentLedgerId(userId);
         YearMonth now = YearMonth.now();
         LocalDate startDate = now.atDay(1);
         LocalDate endDate = now.atEndOfMonth();
 
         LambdaQueryWrapper<Bill> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Bill::getUserId, userId)
+               .eq(Bill::getLedgerId, ledgerId)
                .eq(Bill::getType, 2) // expense only
                .ge(Bill::getBillDate, startDate)
                .le(Bill::getBillDate, endDate);
@@ -134,11 +142,14 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public List<BudgetProgressVO> getBudgetProgress(Long userId) {
+        Long ledgerId = ledgerService.getCurrentLedgerId(userId);
         String month = YearMonth.now().toString();
         Map<Long, String> categoryMap = getCategoryMap();
 
         LambdaQueryWrapper<Budget> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Budget::getUserId, userId).eq(Budget::getMonth, month);
+        wrapper.eq(Budget::getUserId, userId)
+               .eq(Budget::getLedgerId, ledgerId)
+               .eq(Budget::getMonth, month);
         List<Budget> budgets = budgetMapper.selectList(wrapper);
 
         if (budgets.isEmpty()) return List.of();
@@ -149,6 +160,7 @@ public class DashboardServiceImpl implements DashboardService {
         // Calculate used amount per category
         LambdaQueryWrapper<Bill> billWrapper = new LambdaQueryWrapper<>();
         billWrapper.eq(Bill::getUserId, userId)
+                   .eq(Bill::getLedgerId, ledgerId)
                    .eq(Bill::getType, 2)
                    .ge(Bill::getBillDate, startDate)
                    .le(Bill::getBillDate, endDate);

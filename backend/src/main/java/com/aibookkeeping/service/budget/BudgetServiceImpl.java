@@ -9,6 +9,7 @@ import com.aibookkeeping.exception.ErrorCode;
 import com.aibookkeeping.mapper.BillMapper;
 import com.aibookkeeping.mapper.BudgetMapper;
 import com.aibookkeeping.mapper.CategoryMapper;
+import com.aibookkeeping.service.ledger.LedgerService;
 import com.aibookkeeping.vo.BudgetUsageVO;
 import com.aibookkeeping.vo.BudgetVO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -34,11 +35,14 @@ public class BudgetServiceImpl implements BudgetService {
     private final BudgetMapper budgetMapper;
     private final BillMapper billMapper;
     private final CategoryMapper categoryMapper;
+    private final LedgerService ledgerService;
 
     @Override
     public List<BudgetVO> listBudgets(Long userId, String month) {
+        Long ledgerId = ledgerService.getCurrentLedgerId(userId);
         LambdaQueryWrapper<Budget> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Budget::getUserId, userId)
+               .eq(Budget::getLedgerId, ledgerId)
                .eq(Budget::getMonth, month)
                .orderByAsc(Budget::getCategoryId);
 
@@ -51,9 +55,11 @@ public class BudgetServiceImpl implements BudgetService {
 
     @Override
     public BudgetVO createOrUpdateBudget(BudgetRequest request, Long userId) {
-        // 查找同月同分类的预算（Upsert 逻辑）
+        Long ledgerId = ledgerService.getCurrentLedgerId(userId);
+        // 查找同账本、同月、同分类的预算（Upsert 逻辑）
         LambdaQueryWrapper<Budget> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Budget::getUserId, userId)
+               .eq(Budget::getLedgerId, ledgerId)
                .eq(Budget::getMonth, request.getMonth())
                .eq(request.getCategoryId() != null, Budget::getCategoryId, request.getCategoryId())
                .isNull(request.getCategoryId() == null, Budget::getCategoryId);
@@ -63,48 +69,49 @@ public class BudgetServiceImpl implements BudgetService {
         if (existing != null) {
             existing.setAmount(request.getAmount());
             budgetMapper.updateById(existing);
-            log.info("Budget updated: userId={}, budgetId={}", userId, existing.getId());
             return convertToVO(existing, getCategoryMap());
         }
 
         Budget budget = new Budget();
         budget.setUserId(userId);
+        budget.setLedgerId(ledgerId);
         budget.setCategoryId(request.getCategoryId());
         budget.setAmount(request.getAmount());
         budget.setMonth(request.getMonth());
         budgetMapper.insert(budget);
-        log.info("Budget created: userId={}, budgetId={}", userId, budget.getId());
         return convertToVO(budget, getCategoryMap());
     }
 
     @Override
     public void deleteBudget(Long id, Long userId) {
+        Long ledgerId = ledgerService.getCurrentLedgerId(userId);
         Budget budget = budgetMapper.selectById(id);
         if (budget == null) {
             throw new BusinessException(ErrorCode.BUDGET_NOT_FOUND);
         }
-        if (!budget.getUserId().equals(userId)) {
+        if (!budget.getUserId().equals(userId) || !budget.getLedgerId().equals(ledgerId)) {
             throw new BusinessException(ErrorCode.BUDGET_NO_PERMISSION);
         }
         budgetMapper.deleteById(id);
-        log.info("Budget deleted: userId={}, budgetId={}", userId, id);
     }
 
     @Override
     public List<BudgetUsageVO> getBudgetUsage(Long userId, String month) {
-        // 获取该月所有预算
+        Long ledgerId = ledgerService.getCurrentLedgerId(userId);
+        // 获取该账本该月所有预算
         List<BudgetVO> budgets = listBudgets(userId, month);
         if (budgets.isEmpty()) {
             return List.of();
         }
 
-        // 查询该月所有支出
+        // 查询该账本该月所有支出
         YearMonth yearMonth = YearMonth.parse(month, DateTimeFormatter.ofPattern("yyyy-MM"));
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
 
         LambdaQueryWrapper<Bill> billWrapper = new LambdaQueryWrapper<>();
         billWrapper.eq(Bill::getUserId, userId)
+                   .eq(Bill::getLedgerId, ledgerId)
                    .eq(Bill::getType, 2) // 只统计支出
                    .ge(Bill::getBillDate, startDate)
                    .le(Bill::getBillDate, endDate);

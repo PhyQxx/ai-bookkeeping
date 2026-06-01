@@ -13,7 +13,11 @@
           <div style="text-align: center; padding: 20px 0;">
             <el-avatar :size="80" :src="userStore.userInfo?.avatar || ''" icon="UserFilled" />
             <h3 style="margin-top: 12px;">{{ userStore.userInfo?.nickname || userStore.userInfo?.username }}</h3>
-            <p style="color: #909399; font-size: 14px;">{{ userStore.userInfo?.username }}</p>
+            <p style="color: #909399; font-size: 14px; margin-bottom: 20px;">{{ userStore.userInfo?.username }}</p>
+            <el-divider />
+            <el-button @click="router.push('/audit-logs')" style="width: 100%;">
+              <el-icon style="margin-right: 8px;"><List /></el-icon> 操作审计日志
+            </el-button>
           </div>
         </el-card>
       </el-col>

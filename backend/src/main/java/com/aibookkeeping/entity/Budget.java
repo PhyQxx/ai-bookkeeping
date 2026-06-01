@@ -21,6 +21,8 @@ public class Budget {
 
     private Long userId;
 
+    private Long ledgerId;
+
     /**
      * NULL = 月度总预算, 非NULL = 分类预算
      */

@@ -1,6 +1,7 @@
 package com.aibookkeeping.service.bill;
 
 import com.aibookkeeping.dto.AiConfirmRequest;
+import com.aibookkeeping.dto.AiOcrRequest;
 import com.aibookkeeping.dto.AiParseRequest;
 import com.aibookkeeping.dto.BillRequest;
 import com.aibookkeeping.vo.AiParsePreviewVO;
@@ -16,7 +17,13 @@ public interface BillService {
 
     AiParsePreviewVO aiParsePreview(AiParseRequest request, Long userId);
 
+    List<AiParsePreviewVO> aiBatchParsePreview(AiParseRequest request, Long userId);
+
+    AiParsePreviewVO aiOcrPreview(AiOcrRequest request, Long userId);
+
     BillVO aiConfirmCreate(AiConfirmRequest request, Long userId);
+
+    List<BillVO> aiBatchConfirmCreate(List<AiConfirmRequest> requests, Long userId);
 
     BillVO createBill(BillRequest request, Long userId);
 
@@ -27,7 +34,9 @@ public interface BillService {
     void batchDeleteBills(List<Long> ids, Long userId);
 
     Page<BillVO> listBills(Long userId, Integer type, Long categoryId,
-                           String startDate, String endDate, int pageNum, int pageSize);
+                           String startDate, String endDate,
+                           String searchText, BigDecimal minAmount, BigDecimal maxAmount,
+                           int pageNum, int pageSize);
 
     BillVO getBill(Long id, Long userId);
 }

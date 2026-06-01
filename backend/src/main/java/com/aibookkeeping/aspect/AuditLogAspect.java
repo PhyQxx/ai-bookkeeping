@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -43,6 +45,13 @@ public class AuditLogAspect {
                 auditLog.setIp(getClientIp(request));
                 auditLog.setMethod(request.getMethod());
                 auditLog.setPath(request.getRequestURI());
+            }
+
+            // Extract user info
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof Long) {
+                auditLog.setUserId((Long) auth.getPrincipal());
+                auditLog.setUsername(auth.getName());
             }
 
             // Determine action and module from controller class/method

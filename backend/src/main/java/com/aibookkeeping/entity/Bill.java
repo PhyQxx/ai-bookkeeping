@@ -16,6 +16,8 @@ public class Bill {
 
     private Long userId;
 
+    private Long ledgerId;
+
     private BigDecimal amount;
 
     /** 1=收入, 2=支出 */

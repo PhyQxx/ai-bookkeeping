@@ -6,8 +6,8 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background-color: #f5f7fa;
-  color: #303133;
+  background-color: var(--el-bg-color-page);
+  color: var(--el-text-color-primary);
 }
 
 #app {
@@ -26,7 +26,7 @@ body {
 .auth-card {
   width: 420px;
   padding: 40px;
-  background: #fff;
+  background: var(--el-bg-color);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }
@@ -34,7 +34,7 @@ body {
 .auth-card h2 {
   text-align: center;
   margin-bottom: 30px;
-  color: #303133;
+  color: var(--el-text-color-primary);
   font-size: 24px;
 }
 
@@ -75,8 +75,8 @@ body {
 
 .top-header {
   height: 64px;
-  background: #fff;
-  border-bottom: 1px solid #e4e7ed;
+  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color-light);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -118,15 +118,16 @@ body {
 }
 
 .stat-card {
-  background: #fff;
+  background: var(--el-bg-color);
   border-radius: 8px;
   padding: 20px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--el-box-shadow-light);
+  border: 1px solid var(--el-border-color-lighter);
 }
 
 .stat-card .label {
   font-size: 14px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin-bottom: 8px;
 }
 
@@ -157,7 +158,7 @@ body {
 
 .page-header h2 {
   font-size: 20px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 /* 响应式 */

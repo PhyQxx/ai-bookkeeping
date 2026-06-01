@@ -53,7 +53,13 @@
           <template #header><span>🏆 分类消费排行 Top5</span></template>
           <el-table :data="dashboardStore.categoryRanking" stripe style="width: 100%;">
             <el-table-column type="index" label="#" width="50" />
-            <el-table-column prop="categoryName" label="分类" />
+            <el-table-column prop="categoryName" label="分类">
+              <template #default="{ row }">
+                <el-button type="primary" link @click="router.push({ path: '/bills', query: { categoryId: row.categoryId, type: 2 } })">
+                  {{ row.categoryName }}
+                </el-button>
+              </template>
+            </el-table-column>
             <el-table-column prop="amount" label="金额" align="right">
               <template #default="{ row }">
                 <span style="color: #f56c6c; font-weight: bold;">¥{{ row.amount.toFixed(2) }}</span>
@@ -98,9 +104,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { useDashboardStore } from '@/stores/dashboard'
 import * as echarts from 'echarts'
 
+const router = useRouter()
 const dashboardStore = useDashboardStore()
 const summary = computed(() => dashboardStore.summary)
 
@@ -137,7 +145,18 @@ function updateTrendChart() {
 
 function initPieChart() {
   if (!pieChartRef.value) return
-  pieChart = echarts.init(pieChartRef.value)
+  if (!pieChart) {
+    pieChart = echarts.init(pieChartRef.value)
+    pieChart.on('click', (params: any) => {
+      const rank = dashboardStore.categoryRanking.find(r => r.categoryName === params.name)
+      if (rank && rank.categoryId) {
+        router.push({
+          path: '/bills',
+          query: { categoryId: rank.categoryId, type: 2 }
+        })
+      }
+    })
+  }
   updatePieChart()
 }
 

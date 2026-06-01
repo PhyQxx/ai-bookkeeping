@@ -6,6 +6,7 @@ import com.aibookkeeping.vo.CategoryRatioVO;
 import com.aibookkeeping.vo.DailyTrendVO;
 import com.aibookkeeping.vo.MonthlyStatVO;
 import com.aibookkeeping.vo.TrendVO;
+import com.aibookkeeping.vo.YearlyStatVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,16 @@ public class StatController {
             Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
         MonthlyStatVO vo = statService.getMonthlyStat(userId, month);
+        return Result.success(vo);
+    }
+
+    @GetMapping("/yearly")
+    @Operation(summary = "年度收支总览")
+    public Result<YearlyStatVO> getYearlyStat(
+            @RequestParam(defaultValue = "#{T(java.time.Year).now().toString()}") String year,
+            Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        YearlyStatVO vo = statService.getYearlyStat(userId, year);
         return Result.success(vo);
     }
 

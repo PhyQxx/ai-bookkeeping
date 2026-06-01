@@ -2,15 +2,18 @@
   <div>
     <!-- 筛选栏 -->
     <el-card style="margin-bottom: 16px;">
-      <el-form :inline="true" :model="filters">
+      <el-form :inline="true" :model="filters" size="default">
+        <el-form-item label="关键字">
+          <el-input v-model="filters.searchText" placeholder="搜索备注..." clearable style="width: 180px;" @keyup.enter="loadBills" />
+        </el-form-item>
         <el-form-item label="类型">
-          <el-select v-model="filters.type" placeholder="全部" clearable style="width: 120px;">
+          <el-select v-model="filters.type" placeholder="全部" clearable style="width: 100px;">
             <el-option label="支出" :value="2" />
             <el-option label="收入" :value="1" />
           </el-select>
         </el-form-item>
         <el-form-item label="分类">
-          <el-select v-model="filters.categoryId" placeholder="全部" clearable style="width: 140px;">
+          <el-select v-model="filters.categoryId" placeholder="全部" clearable style="width: 120px;">
             <el-option v-for="cat in categories" :key="cat.id" :label="cat.name" :value="cat.id" />
           </el-select>
         </el-form-item>
@@ -19,16 +22,24 @@
             v-model="filters.dateRange"
             type="daterange"
             range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
+            start-placeholder="开始"
+            end-placeholder="结束"
             value-format="YYYY-MM-DD"
-            style="width: 260px;"
+            style="width: 240px;"
           />
         </el-form-item>
+        <el-form-item label="金额">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <el-input-number v-model="filters.minAmount" :min="0" :precision="2" placeholder="最小" style="width: 110px;" :controls="false" />
+            <span>-</span>
+            <el-input-number v-model="filters.maxAmount" :min="0" :precision="2" placeholder="最大" style="width: 110px;" :controls="false" />
+          </div>
+        </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="loadBills">查询</el-button>
+          <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="resetFilters">重置</el-button>
           <el-button type="success" @click="showExportDialog = true">📥 导出</el-button>
+          <el-button type="warning" @click="showImportDialog = true"><el-icon><Upload /></el-icon> 导入</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -183,6 +194,7 @@
           <el-radio-group v-model="exportForm.format">
             <el-radio value="excel">Excel (.xlsx)</el-radio>
             <el-radio value="csv">CSV</el-radio>
+            <el-radio value="pdf">PDF (.pdf)</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -191,16 +203,53 @@
         <el-button type="primary" @click="handleExport" :loading="exportLoading">导出</el-button>
       </template>
     </el-dialog>
+
+    <!-- 导入弹窗 -->
+    <el-dialog v-model="showImportDialog" title="导入第三方账单" width="480px">
+      <el-form :model="importForm" label-width="80px">
+        <el-form-item label="账单来源">
+          <el-radio-group v-model="importForm.platform">
+            <el-radio value="alipay">支付宝 (CSV)</el-radio>
+            <el-radio value="wechat">微信支付 (CSV)</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="选择文件">
+          <el-upload
+            class="upload-demo"
+            drag
+            action="#"
+            :auto-upload="false"
+            :on-change="handleFileChange"
+            :limit="1"
+            accept=".csv"
+          >
+            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+            <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+            <template #tip>
+              <div class="el-upload__tip">仅支持 .csv 格式文件</div>
+            </template>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showImportDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleImport" :loading="importLoading" :disabled="!importForm.file">开始导入</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { listBills, updateBill, deleteBill, getBillDetail, batchDeleteBills, exportBills } from '@/api/bill'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { listBills, updateBill, deleteBill, getBillDetail, batchDeleteBills, exportBills, importAlipay, importWechat } from '@/api/bill'
 import { listCategories } from '@/api/category'
 import type { Bill, Category } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Upload, UploadFilled } from '@element-plus/icons-vue'
 
+const route = useRoute()
+const router = useRouter()
 const bills = ref<Bill[]>([])
 const categories = ref<Category[]>([])
 const loading = ref(false)
@@ -212,8 +261,47 @@ const selectedIds = ref<number[]>([])
 const filters = reactive({
   type: undefined as number | undefined,
   categoryId: undefined as number | undefined,
-  dateRange: null as string[] | null
+  dateRange: null as string[] | null,
+  searchText: '',
+  minAmount: undefined as number | undefined,
+  maxAmount: undefined as number | undefined
 })
+
+const handleSearch = () => {
+  pageNum.value = 1
+  loadBills()
+}
+
+// 导入相关
+const showImportDialog = ref(false)
+const importLoading = ref(false)
+const importForm = reactive({
+  platform: 'alipay',
+  file: null as File | null
+})
+
+const handleFileChange = (file: any) => {
+  importForm.file = file.raw
+}
+
+const handleImport = async () => {
+  if (!importForm.file) return
+  importLoading.value = true
+  try {
+    const res = importForm.platform === 'alipay' 
+      ? await importAlipay(importForm.file)
+      : await importWechat(importForm.file)
+    
+    ElMessage.success(`成功导入 ${res.data} 条账单记录`)
+    showImportDialog.value = false
+    importForm.file = null
+    loadBills()
+  } catch (e) {
+    // 错误已处理
+  } finally {
+    importLoading.value = false
+  }
+}
 
 const showEditDialog = ref(false)
 const editLoading = ref(false)
@@ -260,6 +348,9 @@ const loadBills = async () => {
     if (filters.categoryId) params.categoryId = filters.categoryId
     if (filters.dateRange?.[0]) params.startDate = filters.dateRange[0]
     if (filters.dateRange?.[1]) params.endDate = filters.dateRange[1]
+    if (filters.searchText) params.searchText = filters.searchText
+    if (filters.minAmount !== undefined) params.minAmount = filters.minAmount
+    if (filters.maxAmount !== undefined) params.maxAmount = filters.maxAmount
     const res = await listBills(params)
     bills.value = res.data.records
     total.value = res.data.total
@@ -272,6 +363,9 @@ const resetFilters = () => {
   filters.type = undefined
   filters.categoryId = undefined
   filters.dateRange = null
+  filters.searchText = ''
+  filters.minAmount = undefined
+  filters.maxAmount = undefined
   pageNum.value = 1
   loadBills()
 }
@@ -332,13 +426,23 @@ const handleExport = async () => {
     if (exportForm.categoryId) params.categoryId = exportForm.categoryId
     if (exportForm.type) params.type = exportForm.type
     const res = await exportBills(params)
-    const blob = new Blob([res as any], {
-      type: exportForm.format === 'csv' ? 'text/csv;charset=utf-8' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    })
+    
+    let mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    let extension = 'xlsx'
+    
+    if (exportForm.format === 'csv') {
+      mimeType = 'text/csv;charset=utf-8'
+      extension = 'csv'
+    } else if (exportForm.format === 'pdf') {
+      mimeType = 'application/pdf'
+      extension = 'pdf'
+    }
+
+    const blob = new Blob([res as any], { type: mimeType })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `bills_export.${exportForm.format === 'csv' ? 'csv' : 'xlsx'}`
+    a.download = `bills_export_${dayjs().format('YYYYMMDD')}.${extension}`
     a.click()
     window.URL.revokeObjectURL(url)
     showExportDialog.value = false
@@ -366,7 +470,24 @@ const handleBatchDelete = async () => {
   }
 }
 
+const applyQueryFilters = () => {
+  const { categoryId, type, startDate, endDate } = route.query
+  if (categoryId) filters.categoryId = Number(categoryId)
+  if (type) filters.type = Number(type)
+  if (startDate && endDate) {
+    filters.dateRange = [String(startDate), String(endDate)]
+  } else if (startDate) {
+    filters.dateRange = [String(startDate), String(startDate)]
+  }
+}
+
+watch(() => route.query, () => {
+  applyQueryFilters()
+  loadBills()
+}, { deep: true })
+
 onMounted(() => {
+  applyQueryFilters()
   loadBills()
   listCategories().then(res => { categories.value = res.data }).catch(() => {})
 })

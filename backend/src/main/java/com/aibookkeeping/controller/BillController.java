@@ -1,6 +1,7 @@
 package com.aibookkeeping.controller;
 
 import com.aibookkeeping.dto.AiConfirmRequest;
+import com.aibookkeeping.dto.AiOcrRequest;
 import com.aibookkeeping.dto.AiParseRequest;
 import com.aibookkeeping.dto.BillRequest;
 import com.aibookkeeping.exception.Result;
@@ -44,6 +45,24 @@ public class BillController {
         return Result.success(result);
     }
 
+    @PostMapping("/ai-batch-parse-preview")
+    @Operation(summary = "AI 批量解析预览（不入库）")
+    public Result<List<AiParsePreviewVO>> aiBatchParsePreview(@Valid @RequestBody AiParseRequest request,
+                                                               Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        List<AiParsePreviewVO> results = billService.aiBatchParsePreview(request, userId);
+        return Result.success(results);
+    }
+
+    @PostMapping("/ai-ocr-preview")
+    @Operation(summary = "AI 图片识别预览（不入库）")
+    public Result<AiParsePreviewVO> aiOcrPreview(@Valid @RequestBody AiOcrRequest request,
+                                                  Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        AiParsePreviewVO result = billService.aiOcrPreview(request, userId);
+        return Result.success(result);
+    }
+
     @PostMapping("/ai-confirm")
     @Operation(summary = "确认 AI 解析结果并创建账单")
     public Result<BillVO> aiConfirm(@Valid @RequestBody AiConfirmRequest request,
@@ -51,6 +70,15 @@ public class BillController {
         Long userId = (Long) authentication.getPrincipal();
         BillVO vo = billService.aiConfirmCreate(request, userId);
         return Result.success(vo);
+    }
+
+    @PostMapping("/ai-batch-confirm")
+    @Operation(summary = "批量确认 AI 解析结果并创建账单")
+    public Result<List<BillVO>> aiBatchConfirm(@Valid @RequestBody List<AiConfirmRequest> requests,
+                                                Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        List<BillVO> vos = billService.aiBatchConfirmCreate(requests, userId);
+        return Result.success(vos);
     }
 
     @PostMapping
@@ -97,11 +125,14 @@ public class BillController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String searchText,
+            @RequestParam(required = false) java.math.BigDecimal minAmount,
+            @RequestParam(required = false) java.math.BigDecimal maxAmount,
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "20") int pageSize,
             Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        Page<BillVO> page = billService.listBills(userId, type, categoryId, startDate, endDate, pageNum, pageSize);
+        Page<BillVO> page = billService.listBills(userId, type, categoryId, startDate, endDate, searchText, minAmount, maxAmount, pageNum, pageSize);
         return Result.success(page);
     }
 

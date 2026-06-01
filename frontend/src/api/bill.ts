@@ -19,6 +19,9 @@ export function listBills(params: {
   categoryId?: number
   startDate?: string
   endDate?: string
+  searchText?: string
+  minAmount?: number
+  maxAmount?: number
   pageNum?: number
   pageSize?: number
 }) {
@@ -57,6 +60,34 @@ export function aiParsePreview(input: string) {
   return request.post<any, Result<any>>('/bill/ai-parse-preview', { input })
 }
 
+export function aiBatchParsePreview(input: string) {
+  return request.post<any, Result<any>>('/bill/ai-batch-parse-preview', { input })
+}
+
+export function aiOcrPreview(imageBase64: string) {
+  return request.post<any, Result<any>>('/bill/ai-ocr-preview', { imageBase64 })
+}
+
 export function aiConfirmBill(data: any) {
   return request.post<any, Result<Bill>>('/bill/ai-confirm', data)
+}
+
+export function aiBatchConfirm(data: any[]) {
+  return request.post<any, Result<Bill[]>>('/bill/ai-batch-confirm', data)
+}
+
+export function importAlipay(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post<any, Result<number>>('/bill/import/alipay', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+export function importWechat(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post<any, Result<number>>('/bill/import/wechat', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
 }
